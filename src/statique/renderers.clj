@@ -15,7 +15,7 @@
 ; simple regexp to match urls
 (def ^:private url-pattern #"^https?://([\w\\.\-]+)(\/?([\w\\.:]+\/?)*)?(\??([\w\-]+(=[\w\-]+)?&?)*)?(#[\S]+)?$")
 
-(def ^:private media-services ["youtube.com" "vimeo.com" "flickr.com"])
+(def ^:private media-services ["youtube.com" "vimeo.com" "flickr.com" "youtu.be"])
 
 (defn- process-link-node
    [node]
