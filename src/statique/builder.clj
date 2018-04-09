@@ -102,7 +102,7 @@
   (let [page-notes  (:items page)
         page-index  (:index page)
         rest-notes  (:rest page)
-        notes       (map transform-note page-notes)]
+        notes       (pmap transform-note page-notes)]
     (generate-page fmt-config vars output-dir page-index notes (not (empty? rest-notes)))))
 
 (defn process-dir
@@ -111,11 +111,11 @@
         fmt-config  (freemarker/make-config theme-dir)
         processor   (partial page-processor fmt-config vars output-dir)]
     (log (count notes) " notes were found...")
-    (doall (map processor (pages notes-per-page notes)))))
+    (doall (pmap processor (pages notes-per-page notes)))))
 
 (defn- copy-static
   [root from to]
-  (doall (map #(fs/copy-dir (io/file root %) to) from)))
+  (mapv #(fs/copy-dir (io/file root %) to) from))
 
 (defn generate
   [root-dir config]
@@ -126,6 +126,5 @@
         static          (general :static def-static)
         notes-per-page  (general :notes-per-page def-notes-per-page)
                 vars    (:vars config {})]
-    (do
-      (process-dir notes-dir output-dir theme-dir notes-per-page vars)
-      (copy-static root-dir static output-dir))))
+      (time (process-dir notes-dir output-dir theme-dir notes-per-page vars))
+      (copy-static root-dir static output-dir)))

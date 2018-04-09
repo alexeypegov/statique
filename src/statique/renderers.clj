@@ -26,8 +26,7 @@
           (if (some #(clojure.string/ends-with? host %) media-services)
                 (doto node
                   (.insertAfter (MediaNode. text))
-                  (.unlink))
-                (println "NOT" url host media-services))))))
+                  (.unlink)))))))
 
 (defn- link-visitor
   []
