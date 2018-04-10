@@ -63,7 +63,8 @@
   []
   (fn [url]
     (let [data (or (get @noembed-cache url) (noembed/fetch url))]
-      (swap! noembed-cache assoc url data))))
+      (swap! noembed-cache assoc url data)
+      data)))
 
 (defn transform
   [s]

@@ -11,15 +11,12 @@
     [org.commonmark.node Node CustomNode Link Text CustomNode AbstractVisitor]
     [statique.media MediaNode]))
 
-; simple regexp to match urls
-(def ^:private url-pattern #"^https?://([\w\\.\-]+)(\/?([\w\\.:]+\/?)*)?(\??([\w\-]+(=[\w\-]+)?&?)*)?(#[\S]+)?$")
-
 (def ^:private media-services ["youtube.com" "vimeo.com" "flickr.com" "youtu.be"])
 
 (defn- process-link-node
    [node]
    (let [text (.getLiteral node)]
-     (if (re-find url-pattern text)
+      (if (clojure.string/starts-with? text "http")
        (let [url (java.net.URL. text)
              host (.getHost url)]
           (if (some #(clojure.string/ends-with? host %) media-services)
