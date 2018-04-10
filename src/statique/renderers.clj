@@ -1,5 +1,4 @@
 (ns statique.renderers
-  (:require [statique.noembed :as noembed])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -45,9 +44,9 @@
                :else (proxy-super visitChildren node))))))
 
 (defn- write-media-html
-  [node writer]
+  [cached-noembed node writer]
   (let [url   (.getUrl node)
-        data  (noembed/fetch url)
+        data  (cached-noembed url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
@@ -64,17 +63,18 @@
         (.tag "/a")))))
 
 (defn- media-node-renderer
-  [context]
+  [cached-noembed context]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
       (^void render [_ ^Node node]
-              (write-media-html node writer)))))
+              (write-media-html cached-noembed node writer)))))
 
-(def ^:private html-node-renderer-factory
+(defn- html-node-renderer-factory
+  [cached-noembed]
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
-                   (media-node-renderer context))))
+                   (media-node-renderer cached-noembed context))))
 
 (def ^:private link-post-processor
   (reify PostProcessor
@@ -82,7 +82,8 @@
       (.accept node (link-visitor))
       node)))
 
-(def video-extension
+(defn media-extension
+  [cached-noembed]
   (reify
     Parser$ParserExtension
     (^void extend
@@ -91,4 +92,4 @@
     HtmlRenderer$HtmlRendererExtension
     (^void extend
       [_ ^HtmlRenderer$Builder rendererBuilder]
-      (.nodeRendererFactory rendererBuilder html-node-renderer-factory))))
+      (.nodeRendererFactory rendererBuilder (html-node-renderer-factory cached-noembed)))))

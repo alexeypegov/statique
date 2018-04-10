@@ -13,6 +13,7 @@
 (def def-output-ext     ".html")
 (def def-encoding       "UTF-8")
 (def def-static         "static/")
+(def def-cache          "cache/")
 (def def-notes-per-page 5)
 
 (def ^:private note-file-filter
@@ -123,8 +124,11 @@
         notes-dir       (io/file root-dir (general :notes def-notes))
         output-dir      (io/file root-dir (general :output def-output))
         theme-dir       (io/file root-dir (general :theme def-theme))
+        cache-dir       (io/file root-dir (general :cache def-cache))
         static          (general :static def-static)
         notes-per-page  (general :notes-per-page def-notes-per-page)
                 vars    (:vars config {})]
+      (markdown/read-noembed-cache cache-dir)
       (time (process-dir notes-dir output-dir theme-dir notes-per-page vars))
+      (markdown/write-noembed-cache cache-dir)
       (copy-static root-dir static output-dir)))
