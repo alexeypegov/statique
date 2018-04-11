@@ -9,7 +9,7 @@ Features:
 
 ## Version
 
-0.1 (in development)
+0.1-DEV
 
 ## Usage
 
