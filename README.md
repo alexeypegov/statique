@@ -6,7 +6,10 @@ Features:
 
 - Markdown support (with YAML metadata)
 - Freemarker templates
-- Watch mode
+
+## Version
+
+0.1 (in development)
 
 ## Usage
 
