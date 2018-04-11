@@ -54,7 +54,8 @@
 
 (defn- write-to-file
   [file content & {:keys [create-dirs] :or {create-dirs true}}]
-  (if (= create-dirs true) (.mkdirs (.getParentFile file)))
+  (when (true? create-dirs)
+    (.mkdirs (.getParentFile file)))
   (with-open [w (io/writer file)]
     (.write w content)))
 
@@ -83,9 +84,7 @@
 (defn- prepare-page-file
   [output-dir ndx]
   (io/file output-dir (str
-                        (if (zero? ndx)
-                          "index"
-                          (str "page-" (inc ndx)))
+                        (if (zero? ndx) "index" (str "page-" (inc ndx)))
                         def-output-ext)))
 
 (defn- generate-page

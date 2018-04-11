@@ -1,4 +1,5 @@
 (ns statique.renderers
+  (:require [clojure.string :as s])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -11,18 +12,26 @@
     [org.commonmark.node Node CustomNode Link Text CustomNode AbstractVisitor]
     [statique.media MediaNode]))
 
-(def ^:private media-services ["youtube.com" "vimeo.com" "flickr.com" "youtu.be"])
+(def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com"])
+
+(defn- url?
+  "Checks whatever s is an URL, i.e. starts with URL prefix"
+  [s]
+  (or
+    (s/starts-with? s "http://")
+    (s/starts-with? s "https://")))
 
 (defn- process-link-node
-   [node]
-   (let [text (.getLiteral node)]
-      (if (clojure.string/starts-with? text "http")
-       (let [url (java.net.URL. text)
-             host (.getHost url)]
-          (if (some #(clojure.string/ends-with? host %) media-services)
-                (doto node
-                  (.insertAfter (MediaNode. text))
-                  (.unlink)))))))
+  "Checks whatever given node is an URL and replaces it with a MediaNode if needed"
+  [node]
+  (let [text (.getLiteral node)]
+    (when (url? text)
+      (let [url (java.net.URL. text)
+            host (.getHost url)]
+        (when (some #(s/ends-with? host %) media-services)
+          (doto node
+            (.insertAfter (MediaNode. text))
+            (.unlink)))))))
 
 (defn- link-visitor
   []
@@ -31,7 +40,7 @@
       (visit [node]
              (cond
                (instance? Text node)
-                (if (zero? @link-counter)
+                (when (zero? @link-counter)
                   (process-link-node node))
                (instance? Link node)
                 (do
@@ -41,15 +50,15 @@
                :else (proxy-super visitChildren node))))))
 
 (defn- write-media-html
-  [cached-noembed node writer]
+  [node noembed writer]
   (let [url   (.getUrl node)
-        data  (cached-noembed url)
+        data  (noembed url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
       (let [width   (read-string (str width))
             height  (read-string (str (:height data)))
-            ratio   (* 100 (float (/ (min width height) (max width height))))]
+            ratio   (* (float (/ (min width height) (max width height))) 100)]
         (doto writer
           (.tag "div" {"class" "media" "style" (str "padding-top: " ratio "%;")})
           (.raw (or html url))
@@ -60,18 +69,18 @@
         (.tag "/a")))))
 
 (defn- media-node-renderer
-  [cached-noembed context]
+  [noembed context]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
       (^void render [_ ^Node node]
-              (write-media-html cached-noembed node writer)))))
+             (write-media-html node noembed writer)))))
 
 (defn- html-node-renderer-factory
-  [cached-noembed]
+  [noembed]
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
-                   (media-node-renderer cached-noembed context))))
+                   (media-node-renderer noembed context))))
 
 (def ^:private link-post-processor
   (reify PostProcessor
@@ -80,7 +89,7 @@
       node)))
 
 (defn media-extension
-  [cached-noembed]
+  [noembed]
   (reify
     Parser$ParserExtension
     (^void extend
@@ -89,4 +98,4 @@
     HtmlRenderer$HtmlRendererExtension
     (^void extend
       [_ ^HtmlRenderer$Builder rendererBuilder]
-      (.nodeRendererFactory rendererBuilder (html-node-renderer-factory cached-noembed)))))
+      (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed)))))
