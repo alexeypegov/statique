@@ -12,7 +12,7 @@
     [org.commonmark.node Node CustomNode Link Text CustomNode AbstractVisitor]
     [statique.media MediaNode]))
 
-(def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com"])
+(def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com"])
 
 (defn- url?
   "Checks whatever s is an URL, i.e. starts with URL prefix"
@@ -28,10 +28,17 @@
     (when (url? text)
       (let [url (java.net.URL. text)
             host (.getHost url)]
-        (when (some #(s/ends-with? host %) media-services)
-          (doto node
-            (.insertAfter (MediaNode. text))
-            (.unlink)))))))
+        (cond
+          (some #(s/ends-with? host %) media-services)
+            (doto node
+              (.insertAfter (MediaNode. text))
+              (.unlink))
+          :else ; plain link
+            (let [link (Link. text nil)]
+              (.appendChild link (Text. text))
+              (doto node
+                (.insertAfter link)
+                (.unlink))))))))
 
 (defn- link-visitor
   []

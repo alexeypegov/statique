@@ -42,7 +42,7 @@
   (reverse (sort file-comparator (.listFiles dir note-file-filter))))
 
 (defn- pages
-  [page-size col & {:keys [ndx] :or {ndx 0}}]
+  [page-size col & {:keys [ndx] :or {ndx 1}}]
   (lazy-seq
     (when (seq col)
       (let [page-items (take page-size col)
@@ -88,13 +88,13 @@
   [output-dir ndx]
   (io/file output-dir
     (cond
-      (zero? ndx) (format "index.%s" def-output-ext)
-      :else       (format "page-%d.%s" (inc ndx) def-output-ext))))
+      (= ndx 1)   (format "index.%s" def-output-ext)
+      :else       (format "page-%d.%s" ndx def-output-ext))))
 
 (defn- generate-page
   [fmt-config vars output-dir ndx notes next?]
-  (let [prev       (if (> ndx 0) (dec ndx) -1)
-        next       (if next? (+ ndx 2) -1)
+  (let [prev       (if (> ndx 1) (dec ndx) -1)
+        next       (if next? (inc ndx) -1)
         to-html    (partial fmt->html fmt-config "index" (assoc vars :index ndx :prev prev :next next))
         file       (prepare-page-file output-dir ndx)]
     (write-to-file file (:content (to-html notes)))
@@ -106,7 +106,7 @@
         page-index  (:index page)
         rest-notes  (:rest page)
         transformer (partial transform-note noembed)
-        notes       (pmap transformer page-notes)
+        notes       (map transformer page-notes) ;pmap
         next?       (not (empty? rest-notes))]
     (generate-page fmt-config vars output-dir page-index notes next?)))
 
@@ -116,7 +116,7 @@
         fmt-config  (freemarker/make-config theme-dir)
         processor   (partial page-processor fmt-config vars output-dir noembed)]
     (log/info (count notes) "notes were processed...")
-    (let [pages (count (pmap processor (pages notes-per-page notes)))]
+    (let [pages (count (map processor (pages notes-per-page notes)))] ; pmap
       (log/info pages "pages were generated..."))))
 
 (defn- copy-static
