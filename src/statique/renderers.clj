@@ -52,7 +52,7 @@
 (defn- write-media-html
   [node noembed writer]
   (let [url   (.getUrl node)
-        data  (noembed url)
+        data  (.data noembed url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
