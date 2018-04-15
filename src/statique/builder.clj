@@ -15,7 +15,6 @@
 (def def-output         "./out/")
 (def def-output-ext     "html")
 (def def-encoding       "UTF-8")
-(def def-static         "static/")
 (def def-cache          "cache/")
 (def noembed-cache-name "noembed.edn")
 (def def-notes-per-page 5)
@@ -119,9 +118,11 @@
     (let [pages (count (map processor (pages notes-per-page notes)))] ; pmap
       (log/info pages "pages were generated..."))))
 
-(defn- copy-static
+(defn- copy
   [root from to]
-  (mapv #(fs/copy-dir (io/file root %) to) from))
+  (when (not= from nil)
+    (log/debug "copied" from)
+    (mapv #(fs/copy-dir (io/file root %) to) from)))
 
 (defn generate
   [root-dir config]
@@ -132,10 +133,10 @@
         cache-dir       (io/file root-dir (general :cache def-cache))
         noembed-cache   (io/file cache-dir noembed-cache-name)
         noembed         (noembed/make-noembed noembed-cache)
-        static          (general :static def-static)
+        copy-dirs       (general :copy-dirs nil)
         notes-per-page  (general :notes-per-page def-notes-per-page)
         vars            (:vars config {})]
     (do
       (time (process-dir notes-dir output-dir theme-dir notes-per-page noembed vars))
       (.save noembed)
-      (copy-static root-dir static output-dir))))
+      (copy root-dir copy-dirs output-dir))))

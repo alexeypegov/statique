@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [statique.builder :as builder]
+            [statique.logging :as log]
             [yaml.core :as yaml])
   (:gen-class))
 
@@ -33,4 +34,5 @@
 
 (defn -main
   [& args]
+  (log/set-level :debug)
   (print "yay"))
