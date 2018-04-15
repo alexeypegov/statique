@@ -16,7 +16,6 @@
 (def def-output-ext     "html")
 (def def-encoding       "UTF-8")
 (def def-cache          "cache/")
-(def noembed-cache-name "noembed.edn")
 (def def-notes-per-page 5)
 
 (def ^:private note-file-filter
@@ -105,7 +104,7 @@
         page-index  (:index page)
         rest-notes  (:rest page)
         transformer (partial transform-note noembed)
-        notes       (map transformer page-notes) ;pmap
+        notes       (pmap transformer page-notes)
         next?       (not (empty? rest-notes))]
     (generate-page fmt-config vars output-dir page-index notes next?)))
 
@@ -115,28 +114,30 @@
         fmt-config  (freemarker/make-config theme-dir)
         processor   (partial page-processor fmt-config vars output-dir noembed)]
     (log/info (count notes) "notes were processed...")
-    (let [pages (count (map processor (pages notes-per-page notes)))] ; pmap
+    (let [pages (count (pmap processor (pages notes-per-page notes)))]
       (log/info pages "pages were generated..."))))
 
 (defn- copy
-  [root from to]
-  (when (not= from nil)
-    (log/debug "copied" from)
-    (mapv #(fs/copy-dir (io/file root %) to) from)))
+  [general root output]
+  (when-let [ds (general :copy nil)]
+    (log/debug "copied" ds)
+    (mapv #(fs/copy-dir (io/file root %) output) ds)))
 
-(defn generate
-  [root-dir config]
-  (let [general         (partial value-or-default (:general config {}))
-        notes-dir       (io/file root-dir (general :notes def-notes))
-        output-dir      (io/file root-dir (general :output def-output))
+(defn- generate-notes
+  [general root-dir output noembed vars]
+  (let [notes-dir       (io/file root-dir (general :notes def-notes))
         theme-dir       (io/file root-dir (general :theme def-theme))
-        cache-dir       (io/file root-dir (general :cache def-cache))
-        noembed-cache   (io/file cache-dir noembed-cache-name)
-        noembed         (noembed/make-noembed noembed-cache)
-        copy-dirs       (general :copy-dirs nil)
-        notes-per-page  (general :notes-per-page def-notes-per-page)
-        vars            (:vars config {})]
+        notes-per-page  (general :notes-per-page def-notes-per-page)]
+    (time (process-dir notes-dir output theme-dir notes-per-page noembed vars))))
+
+(defn build
+  [root-dir config]
+  (let [general       (partial value-or-default (:general config {}))
+        output-dir    (io/file root-dir (general :output def-output))
+        global-vars   (:vars config {})
+        cache-dir     (io/file root-dir (general :cache def-cache))
+        noembed       (noembed/make-noembed cache-dir)]
     (do
-      (time (process-dir notes-dir output-dir theme-dir notes-per-page noembed vars))
+      (generate-notes general root-dir output-dir noembed global-vars)
       (.save noembed)
-      (copy root-dir copy-dirs output-dir))))
+      (copy general root-dir output-dir))))

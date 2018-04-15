@@ -30,7 +30,7 @@
 
 (defn build
   [root-dir]
-  (builder/generate root-dir (parse-config root-dir)))
+  (builder/build root-dir (parse-config root-dir)))
 
 (defn -main
   [& args]

@@ -5,7 +5,8 @@
   (:import [clojure.lang Atom]
            [java.io File]))
 
-(def ^:private noembed-url "http://noembed.com/embed")
+(def ^:private noembed-url  "http://noembed.com/embed")
+(def ^:private cache-name   "noembed.edn")
 
 (defn- fetch
   [url]
@@ -37,8 +38,8 @@
     {}))
 
 (defn make-noembed
-  [file-path]
-  (let [file  (io/as-file file-path)
+  [cache-dir]
+  (let [file  (io/file cache-dir cache-name)
         cache (atom (read-edn file))]
     (println (count @cache) "cached noembed entries were read from" (.getPath file))
     (Noembed. cache file)))
