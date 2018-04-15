@@ -9,27 +9,23 @@
             [statique.logging :as log]
             [me.raynes.fs :as fs]))
 
-(def file-ext           ".md")
-(def def-notes          "notes/")
-(def def-theme          "theme/")
-(def def-output         "./out/")
-(def def-output-ext     "html")
-(def def-encoding       "UTF-8")
-(def def-cache          "cache/")
-(def def-notes-per-page 5)
+(def encoding     "UTF-8")
+(def out-ext      "html")
+(def markdown-ext ".md")
 
-(def ^:private note-file-filter
+(defn- ext-filter
+  [ext]
   (reify java.io.FilenameFilter
     (accept [this dir name]
-            (string/ends-with? name file-ext))))
+            (string/ends-with? name ext))))
 
 (defn- value-or-default
-  [config key-name default-value]
-  (get config (keyword key-name) default-value))
+  [config key-name & {:keys [default] :or {default nil}}]
+  (get config (keyword key-name) default))
 
 (defn- slug
   [file]
-  (string/lower-case (string/replace (.getName file) file-ext "")))
+  (string/lower-case (string/replace (.getName file) markdown-ext "")))
 
 (defn- file-comparator
   [file1 file2]
@@ -37,7 +33,7 @@
 
 (defn- list-notes
   [dir]
-  (reverse (sort file-comparator (.listFiles dir note-file-filter))))
+  (reverse (sort file-comparator (.listFiles dir (ext-filter markdown-ext)))))
 
 (defn- pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
@@ -59,7 +55,7 @@
 
 (defn- single-note-writer
   [output-dir {:keys [content file]}]
-  (let [output-file (io/file output-dir (str (slug file) def-output-ext))]
+  (let [output-file (io/file output-dir (str (slug file) out-ext))]
     (write-to-file output-file content)))
 
 (defn- fmt->html
@@ -86,8 +82,8 @@
   [output-dir ndx]
   (io/file output-dir
     (cond
-      (= ndx 1)   (format "index.%s" def-output-ext)
-      :else       (format "page-%d.%s" ndx def-output-ext))))
+      (= ndx 1)   (format "index.%s" out-ext)
+      :else       (format "page-%d.%s" ndx out-ext))))
 
 (defn- generate-page
   [fmt-config vars output-dir ndx notes next?]
@@ -109,9 +105,8 @@
     (generate-page fmt-config vars output-dir page-index notes next?)))
 
 (defn process-dir
-  [notes-dir output-dir theme-dir notes-per-page noembed vars]
+  [notes-dir output-dir theme-dir fmt-config notes-per-page noembed vars]
   (let [notes       (list-notes notes-dir)
-        fmt-config  (freemarker/make-config theme-dir)
         processor   (partial page-processor fmt-config vars output-dir noembed)]
     (log/info (count notes) "notes were processed...")
     (let [pages (count (pmap processor (pages notes-per-page notes)))]
@@ -119,25 +114,47 @@
 
 (defn- copy
   [general root output]
-  (when-let [ds (general :copy nil)]
+  (log/debug "Coping dirs...")
+  (when-let [ds (general :copy)]
     (log/debug "copied" ds)
     (mapv #(fs/copy-dir (io/file root %) output) ds)))
 
 (defn- generate-notes
-  [general root-dir output noembed vars]
-  (let [notes-dir       (io/file root-dir (general :notes def-notes))
-        theme-dir       (io/file root-dir (general :theme def-theme))
-        notes-per-page  (general :notes-per-page def-notes-per-page)]
-    (time (process-dir notes-dir output theme-dir notes-per-page noembed vars))))
+  [general root-dir theme-dir output fmt-config noembed vars]
+  (let [notes-dir       (io/file root-dir (general :notes :default "notes/"))
+        notes-per-page  (general :notes-per-page :default 5)]
+    (time (process-dir notes-dir output theme-dir fmt-config notes-per-page noembed vars))))
+
+(defn- render-page
+  [fmt-config vars name]
+  {:content (freemarker/render fmt-config name vars)
+   :name name})
+
+(defn- page-writer
+  [dir {:keys [content name]}]
+  (let [file (io/file dir (format "%s.%s" name out-ext))]
+    (write-to-file file content)
+    name))
+
+(defn- render-pages
+  [general root theme output fmt-config noembed vars]
+  (log/debug "Rendering standalone pages...")
+  (when-let [pages (general :pages)]
+    (let [renderer    (partial render-page fmt-config vars)
+          writer      (partial page-writer output)]
+      (doall (map (comp log/info writer renderer) pages)))))
 
 (defn build
   [root-dir config]
   (let [general       (partial value-or-default (:general config {}))
-        output-dir    (io/file root-dir (general :output def-output))
-        global-vars   (:vars config {})
-        cache-dir     (io/file root-dir (general :cache def-cache))
-        noembed       (noembed/make-noembed cache-dir)]
+        output-dir    (io/file root-dir (general :output :default "./out/"))
+        theme-dir     (io/file root-dir (general :theme :default "theme/"))
+        cache-dir     (io/file root-dir (general :cache :default "cache/"))
+        fmt-config    (freemarker/make-config theme-dir)
+        noembed       (noembed/make-noembed cache-dir)
+        global-vars   (:vars config {})]
     (do
-      (generate-notes general root-dir output-dir noembed global-vars)
+      (generate-notes general root-dir theme-dir output-dir fmt-config noembed global-vars)
       (.save noembed)
+      (render-pages general root-dir theme-dir output-dir fmt-config noembed global-vars)
       (copy general root-dir output-dir))))
