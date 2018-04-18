@@ -8,7 +8,8 @@
            [org.commonmark.ext.front.matter YamlFrontMatterVisitor]))
 
 (def ^:private array-values ["Tags"])
-(def ^:private default-extensions [(YamlFrontMatterExtension/create) (StrikethroughExtension/create)])
+(def ^:private default-extensions [(YamlFrontMatterExtension/create)
+                                   (StrikethroughExtension/create)])
 
 (defn- prepare-meta
   [front-matter-visitor]

@@ -38,7 +38,10 @@
 (defn- note-files
   [config]
   (let [dir (as-file config :notes "notes/")]
-    (reverse (sort file-comparator (.listFiles dir (ext-filter markdown-ext))))))
+    (reverse
+      (sort file-comparator
+            (.listFiles dir
+                        (ext-filter markdown-ext))))))
 
 (defn- pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
@@ -68,7 +71,8 @@
   (let [links-extension (renderers/media-extension noembed)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
-      :file file)))
+      :file file
+      :slug (slug file))))
 
 (defn- make-page-filename
   [ndx]
@@ -100,7 +104,7 @@
                                writer
                                #(assoc %
                                   :content (to-html "note" %)
-                                  :filename (format "%s.%s" (slug (get-in % [:note :file])) out-ext))
+                                  :filename (format "%s.%s" (get-in % [:note :slug]) out-ext))
                                #(assoc {} :vars global-vars :note %))
                              notes))
                 "notes were written")
