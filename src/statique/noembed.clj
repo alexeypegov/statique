@@ -28,7 +28,7 @@
          data))
   (save [this]
         (.mkdirs (.getParentFile file))
-        (println (count @(.cache this)) "noembed entries was written to" (.getPath file))
+        (println (count @(.cache this)) "noembed entries were written to" (.getPath file))
         (spit file (with-out-str (pr @(.cache this))))))
 
 (defn- read-edn

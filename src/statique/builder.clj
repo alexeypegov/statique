@@ -9,19 +9,16 @@
             [statique.logging :as log]
             [me.raynes.fs :as fs]))
 
-(def encoding     "UTF-8")
-(def out-ext      "html")
-(def markdown-ext ".md")
+(def encoding       "UTF-8")
+(def out-ext        "html")
+(def markdown-ext   ".md")
+(def default-output "./out/")
 
 (defn- ext-filter
   [ext]
   (reify java.io.FilenameFilter
     (accept [this dir name]
             (string/ends-with? name ext))))
-
-(defn- value-or-default
-  [config key-name & {:keys [default] :or {default nil}}]
-  (get config (keyword key-name) default))
 
 (defn- slug
   [file]
@@ -31,45 +28,40 @@
   [file1 file2]
   (compare (.getName file1) (.getName file2)))
 
-(defn- list-notes
-  [dir]
-  (reverse (sort file-comparator (.listFiles dir (ext-filter markdown-ext)))))
+(defn- as-file
+  [config key default]
+  (let [root-dir  (:root config)
+        general   (:general config {})
+        name      (get general key default)]
+    (io/file root-dir name)))
+
+(defn- note-files
+  [config]
+  (let [dir (as-file config :notes "notes/")]
+    (reverse (sort file-comparator (.listFiles dir (ext-filter markdown-ext))))))
 
 (defn- pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
   (lazy-seq
     (when (seq col)
-      (let [page-items (take page-size col)
-            rest-items (drop page-size col)]
-          (cons {:items page-items
-                 :rest rest-items
-                 :index ndx}
-                (pages page-size rest-items :ndx (inc ndx)))))))
+      (let [items (take page-size col)
+            rest  (drop page-size col)
+            next? (not (empty? rest))]
+          (cons {:items (doall items)
+                 :ndx   ndx
+                 :next  (if next? (inc ndx) -1)
+                 :prev  (if (> ndx 1) (dec ndx) -1)}
+                (pages page-size rest :ndx (inc ndx)))))))
 
-(defn- write-to-file
-  [file content & {:keys [create-dirs] :or {create-dirs true}}]
-  (when (true? create-dirs)
-    (.mkdirs (.getParentFile file)))
-  (with-open [w (io/writer file)]
-    (.write w content)))
-
-(defn- single-note-writer
-  [output-dir {:keys [content file]}]
-  (let [output-file (io/file output-dir (str (slug file) out-ext))]
-    (write-to-file output-file content)))
-
-(defn- fmt->html
-  [fmt-config template-name vars note]
-  (let [render (partial freemarker/render fmt-config template-name)]
-    (if (seq? note)
-      {:content (render (assoc vars :notes note))}
-      (assoc note :content (render (assoc vars :note note))))))
-
-(defn- generate-notes
-  [fmt-config vars output-dir notes]
-  (let [to-html (partial fmt->html fmt-config "note" vars)
-        to-file (partial single-note-writer output-dir)]
-    (map (comp to-file to-html) notes)))
+(defn- file-writer
+  [output-dir {:keys [content filename]}]
+  {:pre [(string? content) (string? filename)]}
+  (let [file (io/file output-dir filename)]
+    (do
+      (.mkdirs (.getParentFile file))
+      (with-open [w (io/writer file)]
+        (.write w content)
+        (.getPath file)))))
 
 (defn- transform-note
   [noembed file]
@@ -78,83 +70,93 @@
       (markdown/transform (slurp file) :extensions links-extension)
       :file file)))
 
-(defn- prepare-page-file
-  [output-dir ndx]
-  (io/file output-dir
-    (cond
-      (= ndx 1)   (format "index.%s" out-ext)
-      :else       (format "page-%d.%s" ndx out-ext))))
+(defn- make-page-filename
+  [ndx]
+  (if (= ndx 1)
+    (format "index.%s" out-ext)
+    (format "page-%d.%s" ndx out-ext)))
 
-(defn- generate-page
-  [fmt-config vars output-dir ndx notes next?]
-  (let [prev       (if (> ndx 1) (dec ndx) -1)
-        next       (if next? (inc ndx) -1)
-        to-html    (partial fmt->html fmt-config "index" (assoc vars :index ndx :prev prev :next next))
-        file       (prepare-page-file output-dir ndx)]
-    (write-to-file file (:content (to-html notes)))
-    #_(generate-notes fmt-config vars output-dir notes)))
+(defn- freemarker-transformer
+  [config]
+  (let [theme-dir  (as-file config :theme "theme/")
+        fmt-config (freemarker/make-config theme-dir)]
+    (partial freemarker/render fmt-config)))
 
-(defn- page-processor
-  [fmt-config vars output-dir noembed page]
-  (let [page-notes  (:items page)
-        page-index  (:index page)
-        rest-notes  (:rest page)
-        transformer (partial transform-note noembed)
-        notes       (pmap transformer page-notes)
-        next?       (not (empty? rest-notes))]
-    (generate-page fmt-config vars output-dir page-index notes next?)))
+(defn- make-writer
+  [config]
+  (let [output-dir (as-file config :output default-output)]
+    (partial file-writer output-dir)))
 
-(defn process-dir
-  [notes-dir output-dir theme-dir fmt-config notes-per-page noembed vars]
-  (let [notes       (list-notes notes-dir)
-        processor   (partial page-processor fmt-config vars output-dir noembed)]
-    (log/info (count notes) "notes were processed...")
-    (let [pages (count (pmap processor (pages notes-per-page notes)))]
-      (log/info pages "pages were generated..."))))
+(defn- render-notes
+  [config notes]
+  (let [notes-per-page  (get-in config [:general :notes-per-page] 5)
+        writer          (make-writer config)
+        global-vars     (:vars config)
+        to-html         (freemarker-transformer config)]
+    (do
+      ; todo: extract
+      ; write single notes
+      (log/info (count (pmap (comp
+                               writer
+                               #(assoc %
+                                  :content (to-html "note" %)
+                                  :filename (format "%s.%s" (slug (get-in % [:note :file])) out-ext))
+                               #(assoc {} :vars global-vars :note %))
+                             notes))
+                "notes were written")
+      ; write paged notes
+      (log/info (count (pmap (comp
+                               writer
+                               #(assoc %
+                                  :content (to-html "index" %)
+                                  :filename (make-page-filename (:ndx %)))
+                               #(assoc % :vars global-vars))
+                             (pages notes-per-page notes)))
+                "pages were written"))))
 
-(defn- copy
-  [general root output]
-  (log/debug "Coping dirs...")
-  (when-let [ds (general :copy)]
-    (log/debug "copied" ds)
-    (mapv #(fs/copy-dir (io/file root %) output) ds)))
+(defn- prepare-notes
+  [config noembed]
+  (let [transform (partial transform-note noembed)]
+    (pmap transform (note-files config))))
 
-(defn- generate-notes
-  [general root-dir theme-dir output fmt-config noembed vars]
-  (let [notes-dir       (io/file root-dir (general :notes :default "notes/"))
-        notes-per-page  (general :notes-per-page :default 5)]
-    (time (process-dir notes-dir output theme-dir fmt-config notes-per-page noembed vars))))
+(defn make-noembed
+  [config]
+  (noembed/make-noembed (as-file config :cache "cache/")))
 
-(defn- render-page
-  [fmt-config vars name]
-  {:content (freemarker/render fmt-config name vars)
-   :name name})
+(defn- render-standalone
+  [config]
+  (when-let [pages (get-in config [:general :pages])]
+    (let [to-html     (freemarker-transformer config)
+          global-vars (:vars config)
+          writer      (make-writer config)]
+      (log/info (count (pmap (comp
+                               writer
+                               #(assoc {}
+                                  :content (to-html % {:vars global-vars})
+                                  :filename (format "%s.%s" % out-ext)))
+                             pages))
+                "standalone pages were written"))))
 
-(defn- page-writer
-  [dir {:keys [content name]}]
-  (let [file (io/file dir (format "%s.%s" name out-ext))]
-    (write-to-file file content)
-    name))
+(defn- render
+  [config]
+  (let [noembed (make-noembed config)]
+    (do
+      (doall (render-notes config (prepare-notes config noembed)))
+      (.save noembed)
+      (render-standalone config))))
 
-(defn- render-pages
-  [general root theme output fmt-config noembed vars]
-  (log/debug "Rendering standalone pages...")
-  (when-let [pages (general :pages)]
-    (let [renderer    (partial render-page fmt-config vars)
-          writer      (partial page-writer output)]
-      (doall (map (comp log/info writer renderer) pages)))))
+(defn- copy-static
+  [config]
+  (when-let [ds (get-in config [:general :copy])]
+    (let [root   (config :root)
+          output (as-file config :output default-output)]
+      (log/info (count (pmap
+                         #(fs/copy-dir (io/file root %) output)
+                       ds))
+                "dirs were copied"))))
 
 (defn build
-  [root-dir config]
-  (let [general       (partial value-or-default (:general config {}))
-        output-dir    (io/file root-dir (general :output :default "./out/"))
-        theme-dir     (io/file root-dir (general :theme :default "theme/"))
-        cache-dir     (io/file root-dir (general :cache :default "cache/"))
-        fmt-config    (freemarker/make-config theme-dir)
-        noembed       (noembed/make-noembed cache-dir)
-        global-vars   (:vars config {})]
-    (do
-      (generate-notes general root-dir theme-dir output-dir fmt-config noembed global-vars)
-      (.save noembed)
-      (render-pages general root-dir theme-dir output-dir fmt-config noembed global-vars)
-      (copy general root-dir output-dir))))
+  [config]
+  (do
+    (render config)
+    (copy-static config)))

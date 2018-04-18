@@ -7,8 +7,6 @@
            [org.commonmark.ext.front.matter YamlFrontMatterExtension]
            [org.commonmark.ext.front.matter YamlFrontMatterVisitor]))
 
-(defrecord Note [title date tags draft html])
-
 (def ^:private array-values ["Tags"])
 (def ^:private default-extensions [(YamlFrontMatterExtension/create) (StrikethroughExtension/create)])
 
@@ -24,7 +22,7 @@
 
 (defn- make-note
   [front-matter-visitor body]
-  (map->Note (assoc (prepare-meta front-matter-visitor) :body body)))
+  (assoc (prepare-meta front-matter-visitor) :body body))
 
 ;(defn- parse-date
 ;  [date-string date-format]
