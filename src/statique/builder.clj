@@ -7,7 +7,11 @@
             [statique.renderers :as renderers]
             [statique.noembed :as noembed]
             [statique.logging :as log]
-            [me.raynes.fs :as fs]))
+            [me.raynes.fs :as fs]
+            [clj-rss.core :as rss]
+            [clj-time.core :as time]
+            [clj-time.format :as timef]
+            [clj-time.coerce :as timec]))
 
 (def encoding       "UTF-8")
 (def out-ext        "html")
@@ -34,6 +38,10 @@
         general   (:general config {})
         name      (get general key default)]
     (io/file root-dir name)))
+
+(defn- output-dir
+  [config]
+  (as-file config :output default-output))
 
 (defn- note-files
   [config]
@@ -88,12 +96,46 @@
 
 (defn- make-writer
   [config]
-  (let [output-dir (as-file config :output default-output)]
-    (partial file-writer output-dir)))
+  (let [output (output-dir config)]
+    (partial file-writer output)))
+
+(defn- parse-date
+ [formatter s]
+ (timec/to-date (timef/parse formatter s)))
+
+(defn- make-rss-item
+  [config note]
+  (let [base-url        (get-in config [:general :rss :base-url] "/")
+        date-format     (get-in config [:general :date-format] "yyyy-MM-dd")
+        date-formatter  (timef/formatter-local date-format)]
+    (assoc {}
+      :title        (format "<![CDATA[%s]]>" (:title note))
+      :link         (format "%s%s.%s" base-url (:slug note) out-ext)
+      :guid         (:slug note)
+      :pubDate      (parse-date date-formatter (:date note))
+      :description  (format "<![CDATA[%s]]>" (:body note)))))
+
+(defn- render-rss
+  [config notes]
+  (let [output      (output-dir config)
+        vars        (:vars config {})
+        now         (java.util.Date.)
+        url-prefix  (get-in config [:general :rss :url-prefix] "/")
+        to-rss      (partial make-rss-item config)]
+    (file-writer output {:content
+                         (rss/channel-xml {:title          (:blog-title vars)
+                                           :link           (:blog-url vars)
+                                           :description    (:blog-title vars)
+                                           :lastBuildDate  now
+                                           :pubDate        now
+                                           :ttl            "60"}
+                                          (map to-rss notes))
+                         :filename "rss.xml"})))
 
 (defn- render-notes
   [config notes]
   (let [notes-per-page  (get-in config [:general :notes-per-page] 5)
+        rss-notes       (get-in config [:general :rss :count] 0)
         writer          (make-writer config)
         global-vars     (:vars config)
         to-html         (freemarker-transformer config)]
@@ -116,7 +158,10 @@
                                   :filename (make-page-filename (:ndx %)))
                                #(assoc % :vars global-vars))
                              (pages notes-per-page notes)))
-                "pages were written"))))
+                "pages were written")
+      (if (> rss-notes 0)
+        (log/info (render-rss config (take rss-notes notes)))
+        (log/info "RSS generation skipped...")))))
 
 (defn- prepare-notes
   [config noembed]
@@ -153,7 +198,7 @@
   [config]
   (when-let [ds (get-in config [:general :copy])]
     (let [root   (config :root)
-          output (as-file config :output default-output)]
+          output (output-dir config)]
       (log/info (count (pmap
                          #(fs/copy-dir (io/file root %) output)
                        ds))

@@ -15,8 +15,8 @@
   [front-matter-visitor]
   (let [data    (.getData front-matter-visitor)
         mapper  (fn [[k v]] {(keyword (s/lower-case k))
-                           (cond (some #(= k %) array-values) v
-                                 :else (first v))})]
+                             (if (some #(= k %) array-values) v
+                                 (first v))})]
     (merge
       {:draft false}
       (into {} (map mapper data)))))
@@ -24,10 +24,6 @@
 (defn- make-note
   [front-matter-visitor body]
   (assoc (prepare-meta front-matter-visitor) :body body))
-
-;(defn- parse-date
-;  [date-string date-format]
-;  (.parse (java.text.SimpleDateFormat. date-format) date-string))
 
 (defn transform
   [s & {:keys [extensions] :or {extensions []}}]
