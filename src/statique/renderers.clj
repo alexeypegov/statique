@@ -9,7 +9,7 @@
      HtmlRenderer$Builder
      HtmlNodeRendererFactory
      HtmlNodeRendererContext]
-    [org.commonmark.node Node CustomNode Link Text CustomNode AbstractVisitor]
+    [org.commonmark.node Node CustomNode Link Text Image CustomNode AbstractVisitor]
     [statique.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com"])
@@ -56,6 +56,15 @@
                   (swap! link-counter dec))
                :else (proxy-super visitChildren node))))))
 
+(defn- image-visitor
+  [base-url]
+  (proxy [AbstractVisitor] []
+    (visit [node]
+           (cond
+             (instance? Image node)
+              (.setDestination node (format "%s%s" base-url (.getDestination node)))
+             :else (proxy-super visitChildren node)))))
+
 (defn- write-media-html
   [node noembed writer]
   (let [url   (.getUrl node)
@@ -89,19 +98,21 @@
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
                    (media-node-renderer noembed context))))
 
-(def ^:private link-post-processor
+(defn- post-processor
+  [base-url]
   (reify PostProcessor
     (^Node process [_ ^Node node]
       (.accept node (link-visitor))
+      (.accept node (image-visitor base-url))
       node)))
 
 (defn media-extension
-  [noembed]
+  [base-url noembed]
   (reify
     Parser$ParserExtension
     (^void extend
       [_ ^Parser$Builder parserBuilder]
-      (.postProcessor parserBuilder link-post-processor))
+      (.postProcessor parserBuilder (post-processor base-url)))
     HtmlRenderer$HtmlRendererExtension
     (^void extend
       [_ ^HtmlRenderer$Builder rendererBuilder]

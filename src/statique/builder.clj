@@ -7,30 +7,18 @@
             [statique.renderers :as renderers]
             [statique.noembed :as noembed]
             [statique.logging :as log]
+            [statique.util :as u]
             [me.raynes.fs :as fs]
-            [clj-rss.core :as rss]
-            [clj-time.core :as time]
-            [clj-time.format :as timef]
-            [clj-time.coerce :as timec]))
+            [clj-rss.core :as rss]))
 
 (def encoding       "UTF-8")
 (def out-ext        "html")
 (def markdown-ext   ".md")
 (def default-output "./out/")
 
-(defn- ext-filter
-  [ext]
-  (reify java.io.FilenameFilter
-    (accept [this dir name]
-            (string/ends-with? name ext))))
-
 (defn- slug
   [file]
   (string/lower-case (string/replace (.getName file) markdown-ext "")))
-
-(defn- file-comparator
-  [file1 file2]
-  (compare (.getName file1) (.getName file2)))
 
 (defn- as-file
   [config key default]
@@ -47,9 +35,9 @@
   [config]
   (let [dir (as-file config :notes "notes/")]
     (reverse
-      (sort file-comparator
+      (sort u/file-comparator
             (.listFiles dir
-                        (ext-filter markdown-ext))))))
+                        (u/ext-filter markdown-ext))))))
 
 (defn- pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
@@ -64,19 +52,9 @@
                  :prev  (if (> ndx 1) (dec ndx) -1)}
                 (pages page-size rest :ndx (inc ndx)))))))
 
-(defn- file-writer
-  [output-dir {:keys [content filename]}]
-  {:pre [(string? content) (string? filename)]}
-  (let [file (io/file output-dir filename)]
-    (do
-      (.mkdirs (.getParentFile file))
-      (with-open [w (io/writer file)]
-        (.write w content)
-        (.getPath file)))))
-
 (defn- transform-note
-  [noembed file]
-  (let [links-extension (renderers/media-extension noembed)]
+  [base-url noembed file]
+  (let [links-extension (renderers/media-extension base-url noembed)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
       :file file
@@ -97,22 +75,18 @@
 (defn- make-writer
   [config]
   (let [output (output-dir config)]
-    (partial file-writer output)))
-
-(defn- parse-date
- [formatter s]
- (timec/to-date (timef/parse formatter s)))
+    (partial u/write-file output)))
 
 (defn- make-rss-item
   [config note]
-  (let [base-url        (get-in config [:general :rss :base-url] "/")
+  (let [base-url        (get-in config [:general :base-url] "/")
         date-format     (get-in config [:general :date-format] "yyyy-MM-dd")
-        date-formatter  (timef/formatter-local date-format)]
+        date-formatter  (u/local-formatter date-format)]
     (assoc {}
       :title        (format "<![CDATA[%s]]>" (:title note))
       :link         (format "%s%s.%s" base-url (:slug note) out-ext)
       :guid         (:slug note)
-      :pubDate      (parse-date date-formatter (:date note))
+      :pubDate      (u/parse-date date-formatter (:date note))
       :description  (format "<![CDATA[%s]]>" (:body note)))))
 
 (defn- render-rss
@@ -122,7 +96,7 @@
         now         (java.util.Date.)
         url-prefix  (get-in config [:general :rss :url-prefix] "/")
         to-rss      (partial make-rss-item config)]
-    (file-writer output {:content
+    (u/write-file output {:content
                          (rss/channel-xml {:title          (:blog-title vars)
                                            :link           (:blog-url vars)
                                            :description    (:blog-title vars)
@@ -165,7 +139,8 @@
 
 (defn- prepare-notes
   [config noembed]
-  (let [transform (partial transform-note noembed)]
+  (let [base-url  (get-in config [:general :base-url] "")
+        transform (partial transform-note base-url noembed)]
     (pmap transform (note-files config))))
 
 (defn make-noembed
