@@ -141,7 +141,7 @@
   [config noembed]
   (let [base-url  (get-in config [:general :base-url] "")
         transform (partial transform-note base-url noembed)]
-    (pmap transform (note-files config))))
+    (filter #(not (:draft %)) (pmap transform (note-files config)))))
 
 (defn make-noembed
   [config]
