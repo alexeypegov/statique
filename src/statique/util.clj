@@ -14,6 +14,16 @@
   [file1 file2]
   (compare (.getName file1) (.getName file2)))
 
+(defn sorted-files
+  [dir & {:keys [extension] :or {extension "md"}}]
+  (sort file-comparator (.listFiles dir (ext-filter extension))))
+
+(defn file-name
+  [file]
+  (println file)
+  (let [name (.getName file)]
+    (subs name 0 (string/last-index-of name "."))))
+
 (defn local-formatter
   [date-format]
   (timef/formatter-local date-format))

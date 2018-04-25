@@ -34,12 +34,9 @@
 (defn- note-files
   [config]
   (let [dir (as-file config :notes "notes/")]
-    (reverse
-      (sort u/file-comparator
-            (.listFiles dir
-                        (u/ext-filter markdown-ext))))))
+    (reverse (u/sorted-files dir))))
 
-(defn- pages
+(defn- note-pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
   (lazy-seq
     (when (seq col)
@@ -50,15 +47,20 @@
                  :ndx   ndx
                  :next  (if next? (inc ndx) -1)
                  :prev  (if (> ndx 1) (dec ndx) -1)}
-                (pages page-size rest :ndx (inc ndx)))))))
+                (note-pages page-size rest :ndx (inc ndx)))))))
 
-(defn- transform-note
+(defn- transform-file
   [base-url noembed file]
   (let [links-extension (renderers/media-extension base-url noembed)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
-      :file file
-      :slug (slug file))))
+      :file file)))
+
+(defn- transform-note
+  [base-url noembed file]
+  (assoc
+    (transform-file base-url noembed file)
+    :slug (slug file)))
 
 (defn- make-page-filename
   [ndx]
@@ -131,7 +133,7 @@
                                   :content (to-html "index" %)
                                   :filename (make-page-filename (:ndx %)))
                                #(assoc % :vars global-vars))
-                             (pages notes-per-page notes)))
+                             (note-pages notes-per-page notes)))
                 "pages were written")
       (if (> rss-notes 0)
         (log/info (render-rss config (take rss-notes notes)))
@@ -148,26 +150,35 @@
   (noembed/make-noembed (as-file config :cache "cache/")))
 
 (defn- render-standalone
-  [config]
-  (when-let [pages (get-in config [:general :pages])]
-    (let [to-html     (freemarker-transformer config)
-          global-vars (:vars config)
-          writer      (make-writer config)]
-      (log/info (count (pmap (comp
-                               writer
-                               #(assoc {}
-                                  :content (to-html % {:vars global-vars})
-                                  :filename (format "%s.%s" % out-ext)))
-                             pages))
-                "standalone pages were written"))))
+  [config noembed]
+  (let [pages-dir (as-file config :pages "pages/")]
+    (if (.exists pages-dir)
+      (let [pages       (u/sorted-files pages-dir)
+            base-url    (get-in config [:general :base-url] "")
+            to-html     (freemarker-transformer config)
+            global-vars (:vars config)
+            writer      (make-writer config)
+            from-md     (partial transform-file base-url noembed)]
+        (log/info (count (pmap (comp
+                                 writer
+                                 #(assoc {}
+                                    :content (to-html "page" %)
+                                    :filename (format "%s.%s"
+                                                      (u/file-name (:file %))
+                                                      out-ext))
+                                 #(assoc %
+                                    :vars global-vars)
+                                 from-md)
+                               pages))
+                  "standalone pages were written")))))
 
 (defn- render
   [config]
   (let [noembed (make-noembed config)]
     (do
       (doall (render-notes config (prepare-notes config noembed)))
-      (.save noembed)
-      (render-standalone config))))
+      (render-standalone config noembed)
+      (.save noembed))))
 
 (defn- copy-static
   [config]
