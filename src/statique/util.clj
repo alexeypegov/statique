@@ -20,7 +20,6 @@
 
 (defn file-name
   [file]
-  (println file)
   (let [name (.getName file)]
     (subs name 0 (string/last-index-of name "."))))
 
