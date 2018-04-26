@@ -180,15 +180,20 @@
       (render-standalone config noembed)
       (.save noembed))))
 
+(defn- copy
+  [config file]
+  (let [root (:root config)
+        out  (output-dir config)
+        f    (io/file root file)]
+    (if (.isDirectory f)
+      (fs/copy-dir f out)
+      (fs/copy f (io/file out (fs/base-name file))))))
+
 (defn- copy-static
   [config]
   (when-let [ds (get-in config [:general :copy])]
-    (let [root   (config :root)
-          output (output-dir config)]
-      (log/info (count (pmap
-                         #(fs/copy-dir (io/file root %) output)
-                       ds))
-                "dirs were copied"))))
+    (let [cp (partial copy config)]
+      (log/info (count (pmap cp ds)) "files/dirs were copied"))))
 
 (defn build
   [config]
