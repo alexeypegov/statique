@@ -2,6 +2,7 @@
   (:require [slingshot.slingshot :only [throw+]]
             [clojure.java.io :as io]
             [clojure.string :as string]
+            [statique.defaults :as defaults]
             [statique.markdown :as markdown]
             [statique.freemarker :as freemarker]
             [statique.renderers :as renderers]
@@ -14,26 +15,25 @@
 (def encoding       "UTF-8")
 (def out-ext        "html")
 (def markdown-ext   ".md")
-(def default-output "./out/")
 
 (defn- slug
   [file]
   (string/lower-case (string/replace (.getName file) markdown-ext "")))
 
 (defn- as-file
-  [config key default]
+  [config key]
   (let [root-dir  (:root config)
-        general   (:general config {})
-        name      (get general key default)]
+        general   (:general config)
+        name      (get general key)]
     (io/file root-dir name)))
 
 (defn- output-dir
   [config]
-  (as-file config :output default-output))
+  (as-file config :output))
 
 (defn- note-files
   [config]
-  (let [dir (as-file config :notes "notes/")]
+  (let [dir (as-file config :notes)]
     (reverse (u/sorted-files dir))))
 
 (defn- note-pages
@@ -70,7 +70,7 @@
 
 (defn- freemarker-transformer
   [config]
-  (let [theme-dir  (as-file config :theme "theme/")
+  (let [theme-dir  (as-file config :theme)
         fmt-config (freemarker/make-config theme-dir)]
     (partial freemarker/render fmt-config)))
 
@@ -82,7 +82,7 @@
 (defn- make-rss-item
   [config note]
   (let [base-url        (get-in config [:general :base-url] "/")
-        date-format     (get-in config [:general :date-format] "yyyy-MM-dd")
+        date-format     (get-in config [:general :date-format])
         date-formatter  (u/local-formatter date-format)]
     (assoc {}
       :title        (format "<![CDATA[%s]]>" (:title note))
@@ -110,8 +110,8 @@
 
 (defn- render-notes
   [config notes]
-  (let [notes-per-page  (get-in config [:general :notes-per-page] 5)
-        rss-notes       (get-in config [:general :rss :count] 0)
+  (let [notes-per-page  (get-in config [:general :notes-per-page])
+        rss-notes       (get-in config [:general :rss :count])
         writer          (make-writer config)
         global-vars     (:vars config)
         to-html         (freemarker-transformer config)]
@@ -141,20 +141,20 @@
 
 (defn- prepare-notes
   [config noembed]
-  (let [base-url  (get-in config [:general :base-url] "")
+  (let [base-url  (get-in config [:general :base-url])
         transform (partial transform-note base-url noembed)]
     (filter #(not (:draft %)) (pmap transform (note-files config)))))
 
 (defn make-noembed
   [config]
-  (noembed/make-noembed (as-file config :cache "cache/")))
+  (noembed/make-noembed (as-file config :cache)))
 
 (defn- render-standalone
   [config noembed]
-  (let [pages-dir (as-file config :pages "pages/")]
+  (let [pages-dir (as-file config :pages)]
     (if (.exists pages-dir)
       (let [pages       (u/sorted-files pages-dir)
-            base-url    (get-in config [:general :base-url] "")
+            base-url    (get-in config [:general :base-url])
             to-html     (freemarker-transformer config)
             global-vars (:vars config)
             writer      (make-writer config)
@@ -197,6 +197,7 @@
 
 (defn build
   [config]
-  (do
-    (render config)
-    (copy-static config)))
+  (let [merged-config (merge-with into defaults/config config)]
+    (do
+      (render merged-config)
+      (copy-static merged-config))))
