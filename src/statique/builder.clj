@@ -195,9 +195,15 @@
     (let [cp (partial copy config)]
       (log/info (count (pmap cp ds)) "files/dirs were copied"))))
 
-(defn build
+(defn- clean
   [config]
-  (let [merged-config (merge-with into defaults/config config)]
+  (let [out (output-dir config)]
+    (fs/delete-dir out)))
+
+(defn build
+  [blog-config]
+  (let [config (merge-with into defaults/config blog-config)]
     (do
-      (render merged-config)
-      (copy-static merged-config))))
+      (clean config)
+      (render config)
+      (copy-static config))))
