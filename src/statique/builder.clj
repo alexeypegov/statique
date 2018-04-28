@@ -79,44 +79,15 @@
   (let [output (output-dir config)]
     (partial u/write-file output)))
 
-(defn- make-rss-item
-  [config note]
-  (let [base-url        (get-in config [:general :base-url] "/")
-        date-format     (get-in config [:general :date-format])
-        date-formatter  (u/local-formatter date-format)]
-    (assoc {}
-      :title        (format "<![CDATA[%s]]>" (:title note))
-      :link         (format "%s%s.%s" base-url (:slug note) out-ext)
-      :guid         (:slug note)
-      :pubDate      (u/parse-date date-formatter (:date note))
-      :description  (format "<![CDATA[%s]]>" (:body note)))))
-
-(defn- render-rss
-  [config notes]
-  (let [output      (output-dir config)
-        vars        (:vars config {})
-        now         (java.util.Date.)
-        url-prefix  (get-in config [:general :rss :url-prefix] "/")
-        to-rss      (partial make-rss-item config)]
-    (u/write-file output {:content
-                         (rss/channel-xml {:title          (:blog-title vars)
-                                           :link           (:blog-url vars)
-                                           :description    (:blog-title vars)
-                                           :lastBuildDate  now
-                                           :pubDate        now
-                                           :ttl            "60"}
-                                          (map to-rss notes))
-                         :filename "rss.xml"})))
-
 (defn- render-notes
   [config notes]
   (let [notes-per-page  (get-in config [:general :notes-per-page])
         rss-notes       (get-in config [:general :rss :count])
+        feeds           (get-in config [:general :rss :feeds])
         writer          (make-writer config)
         global-vars     (:vars config)
         to-html         (freemarker-transformer config)]
     (do
-      ; todo: extract
       ; write single notes
       (log/info (count (pmap (comp
                                writer
@@ -135,15 +106,28 @@
                                #(assoc % :vars global-vars))
                              (note-pages notes-per-page notes)))
                 "pages were written")
-      (if (> rss-notes 0)
-        (log/info (render-rss config (take rss-notes notes)))
-        (log/info "RSS generation skipped...")))))
+      (when (> rss-notes 0)
+        (pmap (comp
+                writer
+                #(assoc %
+                   :content (to-html (get % :template) %)
+                   :filename (format "%s.%s" (get % :template) "xml"))
+                #(assoc {}
+                   :vars global-vars
+                   :items (take rss-notes notes)
+                   :template %))
+              feeds)))))
 
 (defn- prepare-notes
   [config noembed]
-  (let [base-url  (get-in config [:general :base-url])
-        transform (partial transform-note base-url noembed)]
-    (filter #(not (:draft %)) (pmap transform (note-files config)))))
+  (let [base-url        (get-in config [:general :base-url])
+        transform       (partial transform-note base-url noembed)
+        date-format     (get-in config [:general :date-format])
+        date-formatter  (u/local-formatter date-format)]
+    (pmap #(assoc %
+             :link        (format "%s%s.%s" base-url (:slug %) out-ext)
+             :parsed-date (u/parse-date date-formatter (:date %)))
+      (filter #(not (:draft %)) (pmap transform (note-files config))))))
 
 (defn make-noembed
   [config]

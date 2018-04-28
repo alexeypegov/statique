@@ -8,7 +8,8 @@
              :notes-per-page  10
              :date-format     "yyyy-MM-dd"
              :base-url        "/"
-             :rss             {:count 10}
+             :rss             {:count 10
+                               :feeds ["rss"]}
              :copy            nil
              :pages           nil
              :keep            nil}
