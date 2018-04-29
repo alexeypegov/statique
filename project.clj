@@ -13,7 +13,6 @@
                  [http-kit "2.2.0"]
                  [org.clojure/data.json "0.2.6"]
                  [me.raynes/fs "1.4.6"]
-                 [clj-rss "0.2.3"]
                  [clj-time "0.14.3"]]
   :plugins [[lein-pprint "1.2.0"]
             [lein-difftest "2.0.0"]
@@ -23,4 +22,4 @@
   :repl-options {:init-ns statique.core
                  :caught clj-stacktrace.repl/pst+}
   :main statique.core
-  :aot [statique.core statique.media])
+  :aot [statique.media statique.core])

@@ -9,8 +9,7 @@
             [statique.noembed :as noembed]
             [statique.logging :as log]
             [statique.util :as u]
-            [me.raynes.fs :as fs]
-            [clj-rss.core :as rss]))
+            [me.raynes.fs :as fs]))
 
 (def encoding       "UTF-8")
 (def out-ext        "html")
