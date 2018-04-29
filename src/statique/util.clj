@@ -2,7 +2,8 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [clj-time.format :as timef]
-            [clj-time.coerce :as timec]))
+            [clj-time.coerce :as timec]
+            [statique.logging :as log]))
 
 (defn ext-filter
   [ext]
@@ -41,3 +42,30 @@
       (with-open [w (io/writer file)]
         (.write w content)
         (.getPath file)))))
+
+(defn read-edn
+  [path]
+  (let [file (io/as-file path)]
+    (if (.exists file)
+      (read-string (slurp file))
+      {})))
+
+(defprotocol FileCache
+  (getCached [this k])
+  (save [this]))
+
+(defn make-file-cache
+  [path producer]
+  (let [file        (io/as-file path)
+        data        (read-edn file)
+        write-cache (atom {})]
+    (log/debug (count data) "entries were read from" (.getPath file))
+    (reify FileCache
+      (getCached [_ k]
+           (let [v (or (get data k) (producer k))]
+            (swap! write-cache assoc k v)
+            v))
+      (save [_]
+            (.mkdirs (.getParentFile file))
+            (spit file (with-out-str (pr @write-cache)))
+            (log/debug (count @write-cache) "entries were cached to" (.getPath file))))))
