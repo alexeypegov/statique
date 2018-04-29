@@ -78,45 +78,6 @@
   (let [output (output-dir config)]
     (partial u/write-file output)))
 
-(defn- render-notes
-  [config notes]
-  (let [notes-per-page  (get-in config [:general :notes-per-page])
-        rss-notes       (get-in config [:general :rss :count])
-        feeds           (get-in config [:general :rss :feeds])
-        writer          (make-writer config)
-        global-vars     (:vars config)
-        to-html         (freemarker-transformer config)]
-    (do
-      ; write single notes
-      (log/info (count (pmap (comp
-                               writer
-                               #(assoc %
-                                  :content (to-html "note" %)
-                                  :filename (format "%s.%s" (get-in % [:note :slug]) out-ext))
-                               #(assoc {} :vars global-vars :note %))
-                             notes))
-                "notes were written")
-      ; write paged notes
-      (log/info (count (pmap (comp
-                               writer
-                               #(assoc %
-                                  :content (to-html "index" %)
-                                  :filename (make-page-filename (:ndx %)))
-                               #(assoc % :vars global-vars))
-                             (note-pages notes-per-page notes)))
-                "pages were written")
-      (when (> rss-notes 0)
-        (pmap (comp
-                writer
-                #(assoc %
-                   :content (to-html (get % :template) %)
-                   :filename (format "%s.%s" (get % :template) "xml"))
-                #(assoc {}
-                   :vars global-vars
-                   :items (take rss-notes notes)
-                   :template %))
-              feeds)))))
-
 (defn- prepare-notes
   [config noembed]
   (let [base-url        (get-in config [:general :base-url])
@@ -128,39 +89,76 @@
              :parsed-date (u/parse-date date-formatter (:date %)))
       (filter #(not (:draft %)) (pmap transform (note-files config))))))
 
+(defn- render-everything
+  [config noembed]
+  (let [rss-count       (get-in config [:general :rss :count])
+        pages-dir       (as-file config :pages)
+        writer          (make-writer config)
+        global-vars     (:vars config)
+        to-html         (freemarker-transformer config)]
+    (do
+      (let [notes           (prepare-notes config noembed)
+            notes-per-page  (get-in config [:general :notes-per-page])]
+        ; write single notes
+        (log/info (count (pmap (comp
+                                 writer
+                                 #(assoc %
+                                    :content (to-html "note" %)
+                                    :filename (format "%s.%s" (get-in % [:note :slug]) out-ext))
+                                 #(assoc {} :vars global-vars :note %))
+                               notes))
+                  "notes were written")
+        ; write paged notes
+        (log/info (count (pmap (comp
+                                 writer
+                                 #(assoc %
+                                    :content (to-html "index" %)
+                                    :filename (make-page-filename (:ndx %)))
+                                 #(assoc % :vars global-vars))
+                               (note-pages notes-per-page notes)))
+                  "pages were written")
+        ; write rss feeds
+        (when (> rss-count 0)
+          (let [feeds (get-in config [:general :rss :feeds])]
+            (pmap (comp
+                    writer
+                    #(assoc %
+                       :content (to-html (get % :template) %)
+                       :filename (format "%s.%s" (get % :template) "xml"))
+                    #(assoc {}
+                       :vars global-vars
+                       :items (take rss-count notes)
+                       :template %))
+                  feeds)
+            (log/info (count feeds) "RSS feeds were written"))))
+      ; write standalone pages
+      (if (.exists pages-dir)
+        (let [pages     (u/sorted-files pages-dir)
+              base-url  (get-in config [:general :base-url])
+              from-md   (partial transform-file base-url noembed)]
+          (log/info (count (pmap (comp
+                                   writer
+                                   #(assoc {}
+                                      :content (to-html "page" %)
+                                      :filename (format "%s.%s"
+                                                        (u/file-name (:file %))
+                                                        out-ext))
+                                   #(assoc %
+                                      :vars global-vars)
+                                   from-md)
+                                 pages))
+                    "standalone pages were written"))))))
+
 (defn make-noembed
   [config]
   (noembed/make-noembed (as-file config :cache)))
-
-(defn- render-standalone
-  [config noembed]
-  (let [pages-dir (as-file config :pages)]
-    (if (.exists pages-dir)
-      (let [pages       (u/sorted-files pages-dir)
-            base-url    (get-in config [:general :base-url])
-            to-html     (freemarker-transformer config)
-            global-vars (:vars config)
-            writer      (make-writer config)
-            from-md     (partial transform-file base-url noembed)]
-        (log/info (count (pmap (comp
-                                 writer
-                                 #(assoc {}
-                                    :content (to-html "page" %)
-                                    :filename (format "%s.%s"
-                                                      (u/file-name (:file %))
-                                                      out-ext))
-                                 #(assoc %
-                                    :vars global-vars)
-                                 from-md)
-                               pages))
-                  "standalone pages were written")))))
 
 (defn- render
   [config]
   (let [noembed (make-noembed config)]
     (do
-      (doall (render-notes config (prepare-notes config noembed)))
-      (render-standalone config noembed)
+      (doall
+        (render-everything config noembed))
       (.save noembed))))
 
 (defn- copy
