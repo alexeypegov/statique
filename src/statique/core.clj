@@ -4,35 +4,82 @@
             [clojure.string :as string]
             [statique.builder :as builder]
             [statique.logging :as log]
-            [yaml.core :as yaml])
+            [statique.util :as u]
+            [yaml.core :as yaml]
+            [clojure.tools.cli :as cli]
+            [me.raynes.fs :as fs])
   (:gen-class))
 
 (def config-name         "blog.yaml")
 (def convert-to-symbols  true)
 
-(defn long-string [& strings] (string/join "\n" strings))
+(def cli-options
+  [["-d" "--blog-dir DIR" "Blog dir"
+   :default (io/file (u/working-dir))
+   :default-desc (u/working-dir)
+   :parse-fn #(fs/normalized %)]
+   [nil "--debug" "Debug output"]
+   [nil "--help" "Print this help"]])
 
-(defn valid-dir?
+(defn- usage
+  [cli-summary]
+  (u/long-string  "Statique"
+                  ""
+                  "Usage: statique [options] [command]"
+                  ""
+                  "Options:"
+                  cli-summary
+                  ""
+                  "Commands:"
+                  "  build  Build a blog. By default builds blog in the current dir."
+                  "  new    Create a new note of today"
+                  "  init   Create a new blog"
+                  ""))
+
+(defn- blog-dir?
   [path]
-  (let [file (io/file path)]
+  (let [file (io/as-file path)]
     (and
       (.isDirectory file)
       (.exists (io/file path config-name)))))
 
-(defn exit [status msg]
-  (println msg)
-  (System/exit status))
-
-(defn parse-config
+(defn- parse-config
   [base]
   (let [config-file (io/file base config-name)]
     (yaml/from-file config-file convert-to-symbols)))
 
-(defn build
+(defn- build
   [root-dir]
   (builder/build (assoc (parse-config root-dir) :root root-dir)))
 
+(defn- configure-debug-logging
+  [options]
+  (when
+    (or (:debug options) (Boolean/parseBoolean (System/getProperty "debug")))
+    (log/set-level :debug)))
+
+(defn- execute-command
+  [args options]
+  (let [command (keyword (string/lower-case (first args)))
+        root    (:blog-dir options)]
+    (case command
+      :build (build root))))
+
+(defn- validate-root
+  [options]
+  (let [root (:blog-dir options)]
+    (if (not (blog-dir? root))
+      (u/exit 1
+            (format "Can not find '%s' at '%s'" config-name (.getPath root)))
+      (log/debug (format "Root '%s'" (.getPath root))))))
+
 (defn -main
   [& args]
-  (log/set-level :debug)
-  (print "yay"))
+  (let [{:keys [options arguments errors summary]}  (cli/parse-opts args cli-options)]
+    (cond
+      (:help options) (u/exit 0 (usage summary))
+      errors          (u/exit 1 errors))
+    (configure-debug-logging options)
+    (validate-root options)
+    (execute-command (if (empty? arguments) ["build"] arguments) options)
+    (u/exit 0)))

@@ -13,13 +13,19 @@
                  [http-kit "2.2.0"]
                  [org.clojure/data.json "0.2.6"]
                  [me.raynes/fs "1.4.6"]
-                 [clj-time "0.14.3"]]
+                 [clj-time "0.14.3"]
+                 [org.clojure/tools.cli "0.3.7"]]
   :plugins [[lein-pprint "1.2.0"]
             [lein-difftest "2.0.0"]
             [lein-zprint "0.3.7"]
-            [lein-eftest "0.4.3"]]
-  :profiles {:dev {:dependencies [[clj-stacktrace "0.2.8"]]}}
+            [lein-eftest "0.4.3"]
+            [lein-bin "0.3.4"]]
+  :profiles {:dev {:dependencies [[clj-stacktrace "0.2.8"]]
+                   :jvm-opts ["-Ddebug=true"]}}
   :repl-options {:init-ns statique.core
                  :caught clj-stacktrace.repl/pst+}
   :main statique.core
+  :bin {:name           "statique"
+        :bin-path       "~/bin"
+        :bootclasspath  true}
   :aot [statique.media statique.core])

@@ -5,6 +5,20 @@
             [clj-time.coerce :as timec]
             [statique.logging :as log]))
 
+(defn long-string
+  [& strings]
+  (clojure.string/join "\n" strings))
+
+(defn exit
+  [status & s]
+  (when (seq? s)
+    (long-string s))
+  (System/exit status))
+
+(defn working-dir
+  []
+  (System/getProperty "user.dir"))
+
 (defn ext-filter
   [ext]
   (reify java.io.FilenameFilter

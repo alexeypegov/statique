@@ -4,11 +4,6 @@
 (def ^:private ^:dynamic *level* (:info levels))
 (def ^:private ^:dynamic *colored* true)
 
-(defn set-level
-  [level]
-  {:pre [(number? level) (and (>= level 0) (<= level (:error levels)))]}
-  (set! *level* level))
-
 (defn log
   [& s]
   (println (clojure.string/join " " s)))
@@ -22,3 +17,10 @@
 (defn warn [& s] (apply leveled :warn s))
 (defn error [& s] (apply leveled :error s))
 (defn debug [& s] (apply leveled :debug s))
+
+(defn set-level
+  [level]
+  {:pre [(keyword? level)]}
+  (binding [*level* *level*]
+    (set! *level* (level levels))
+    (debug (format "'%s' logging enabled" (name level)))))
