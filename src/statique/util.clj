@@ -6,51 +6,63 @@
             [statique.logging :as log]))
 
 (defn long-string
+  "Conctenates given strings using newline character"
   [& strings]
-  (clojure.string/join "\n" strings))
+  (clojure.string/join \newline strings))
 
 (defn exit
+  "Exits returing a given status and (optionally) prints some message"
   [status & s]
   (when (seq? s)
     (long-string s))
   (System/exit status))
 
 (defn working-dir
+  "Returns current working directory"
   []
   (System/getProperty "user.dir"))
 
-(defn ext-filter
-  [ext]
+(defn postfix-filter
+  "Creates a postfix filename filter for File::listFiles"
+  [^String postfix]
   (reify java.io.FilenameFilter
     (accept [this dir name]
-            (string/ends-with? name ext))))
+            (string/ends-with? name postfix))))
 
 (defn file-comparator
+  "Filename based file comparator"
   [file1 file2]
-  (compare (.getName file1) (.getName file2)))
+  (compare
+    (.getName file1)
+    (.getName file2)))
 
 (defn sorted-files
-  [dir & {:keys [extension] :or {extension "md"}}]
-  (sort file-comparator (.listFiles dir (ext-filter extension))))
-
-(defn file-name
-  [file]
-  (let [name (.getName file)]
-    (subs name 0 (string/last-index-of name "."))))
+  "Returns sequence of files within the given directory optionally filtered by a postfix"
+  [dir & {:keys [postfix]}]
+  {:pre [(instance? java.io.File dir) (.isDirectory dir)]}
+  (sort
+    file-comparator
+    (if postfix
+      (.listFiles dir (postfix-filter postfix))
+      (.listFiles dir))))
 
 (defn local-formatter
+  "Creates local date/time formatter"
   [date-format]
   (timef/formatter-local date-format))
 
 (defn parse-date
-  "Parses local date"
+  "Parses local date/time using given formatter"
   [formatter s]
   (timec/to-date (timef/parse formatter s)))
 
 (defn write-file
-  [output-dir {:keys [content filename]}]
-  {:pre [(string? content) (string? filename)]}
-  (let [file (io/file output-dir filename)]
+  "Writes given content to a filename placed in the given directory
+   (will create directories if needed)"
+  [dir {:keys [content filename]}]
+  {:pre [(string? content)
+         (string? filename)]}
+  (let [file (io/file dir filename)]
     (do
       (.mkdirs (.getParentFile file))
       (with-open [w (io/writer file)]
@@ -58,17 +70,19 @@
         (.getPath file)))))
 
 (defn read-edn
-  [path]
+  "Reads EDN from the given file, returns default object if empty or no file"
+  [path & {:keys [default] :or {default {}}}]
   (let [file (io/as-file path)]
     (if (.exists file)
       (read-string (slurp file))
-      {})))
+      default)))
 
 (defprotocol FileCache
   (getCached [this k])
   (save [this]))
 
 (defn make-file-cache
+  "Creates a file-based EDN cache given a path and a producer function"
   [path producer]
   (let [file        (io/as-file path)
         data        (read-edn file)

@@ -33,7 +33,7 @@
 (defn- note-files
   [config]
   (let [dir (as-file config :notes)]
-    (reverse (u/sorted-files dir))))
+    (reverse (u/sorted-files dir :postfix ".md"))))
 
 (defn- note-pages
   [page-size col & {:keys [ndx] :or {ndx 1}}]
@@ -139,7 +139,7 @@
             (log/info (count feeds) "RSS feeds were written"))))
       ; write standalone pages
       (when (.exists pages-dir)
-        (let [pages     (u/sorted-files pages-dir)
+        (let [pages     (u/sorted-files pages-dir :postfix ".md")
               base-url  (get-in config [:general :base-url])
               from-md   (partial transform-file base-url noembed)]
           (log/info (count (pmap (comp
@@ -147,7 +147,7 @@
                                    #(assoc {}
                                       :content (to-html "page" %)
                                       :filename (format "%s.%s"
-                                                        (u/file-name (:file %))
+                                                        (fs/name (:file %))
                                                         out-ext))
                                    #(assoc %
                                       :vars global-vars)
