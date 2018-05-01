@@ -3,7 +3,8 @@
             [clojure.string :as string]
             [clj-time.format :as timef]
             [clj-time.coerce :as timec]
-            [statique.logging :as log]))
+            [statique.logging :as log])
+  (:import java.util.Properties))
 
 (defn long-string
   "Conctenates given strings using newline character"
@@ -97,3 +98,13 @@
             (.mkdirs (.getParentFile file))
             (spit file (with-out-str (pr @write-cache)))
             (log/debug (count @write-cache) "entries were cached to" (.getPath file))))))
+
+(defn get-version
+  [dep]
+  (let [path (str "META-INF/maven/" (or (namespace dep) (name dep))
+                  "/" (name dep) "/pom.properties")
+        props (io/resource path)]
+    (when props
+      (with-open [stream (io/input-stream props)]
+        (let [props (doto (Properties.) (.load stream))]
+          (.getProperty props "version"))))))

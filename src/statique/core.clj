@@ -12,6 +12,7 @@
 
 (def config-name         "blog.yaml")
 (def convert-to-symbols  true)
+(def version             (u/get-version 'statique))
 
 (def cli-options
   [["-d" "--blog-dir DIR" "Blog dir"
@@ -23,8 +24,7 @@
 
 (defn- usage
   [cli-summary]
-  (u/long-string  "Statique"
-                  ""
+  (u/long-string  ""
                   "Usage: statique [options] [command]"
                   ""
                   "Options:"
@@ -63,7 +63,8 @@
   (let [command (keyword (string/lower-case (first args)))
         root    (:blog-dir options)]
     (case command
-      :build (build root))))
+      :build (build root)
+      (println (format "Сommand '%s' is not supported [yet]" (first args))))))
 
 (defn- validate-root
   [options]
@@ -75,6 +76,7 @@
 
 (defn -main
   [& args]
+  (println (format "Statique %s" version))
   (let [{:keys [options arguments errors summary]}  (cli/parse-opts args cli-options)]
     (cond
       (:help options) (u/exit 0 (usage summary))

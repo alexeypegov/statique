@@ -11,9 +11,10 @@
             [statique.util :as u]
             [me.raynes.fs :as fs]))
 
-(def encoding       "UTF-8")
-(def out-ext        "html")
-(def markdown-ext   ".md")
+(def encoding         "UTF-8")
+(def out-ext          "html")
+(def markdown-ext     ".md")
+(def statique-string  (format "Statique %s" (u/get-version 'statique)))
 
 (defn- slug
   [file]
@@ -94,7 +95,7 @@
   (let [rss-count       (get-in config [:general :rss :count])
         pages-dir       (as-file config :pages)
         writer          (make-writer config)
-        global-vars     (:vars config)
+        global-vars     (assoc (:vars config) :statique statique-string)
         to-html         (freemarker-transformer config)]
     (do
       (let [notes           (prepare-notes config noembed)
