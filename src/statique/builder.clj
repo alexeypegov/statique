@@ -14,7 +14,10 @@
 (def encoding         "UTF-8")
 (def out-ext          "html")
 (def markdown-ext     ".md")
-(def statique-string  (format "Statique %s" (u/get-version 'statique)))
+(def statique-version (u/get-version 'statique))
+(def statique-string  (format "Statique %s" statique-version))
+(def statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
+                              statique-string))
 
 (defn- slug
   [file]
@@ -95,7 +98,9 @@
   (let [rss-count       (get-in config [:general :rss :count])
         pages-dir       (as-file config :pages)
         writer          (make-writer config)
-        global-vars     (assoc (:vars config) :statique statique-string)
+        global-vars     (assoc (:vars config)
+                          :statique statique-string
+                          :statique-link statique-link)
         to-html         (freemarker-transformer config)]
     (do
       (let [notes           (prepare-notes config noembed)
