@@ -19,24 +19,27 @@
 (def statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                               statique-string))
 
+(def ^:dynamic *noembed* nil)
+(def ^:dynamic *config* nil)
+
 (defn- slug
   [file]
   (string/lower-case (string/replace (.getName file) markdown-ext "")))
 
 (defn- as-file
-  [config key]
-  (let [root-dir  (:root config)
-        general   (:general config)
+  [key]
+  (let [root-dir  (:root *config*)
+        general   (:general *config*)
         name      (get general key)]
     (io/file root-dir name)))
 
 (defn- output-dir
-  [config]
-  (as-file config :output))
+  []
+  (as-file :output))
 
 (defn- note-files
-  [config]
-  (let [dir (as-file config :notes)]
+  []
+  (let [dir (as-file :notes)]
     (reverse (u/sorted-files dir :postfix ".md"))))
 
 (defn- note-pages
@@ -53,16 +56,16 @@
                 (note-pages page-size rest :ndx (inc ndx)))))))
 
 (defn- transform-file
-  [base-url noembed file]
-  (let [links-extension (renderers/media-extension base-url noembed)]
+  [base-url file]
+  (let [links-extension (renderers/media-extension base-url *noembed*)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
       :file file)))
 
 (defn- transform-note
-  [base-url noembed file]
+  [base-url file]
   (assoc
-    (transform-file base-url noembed file)
+    (transform-file base-url file)
     :slug (slug file)))
 
 (defn- make-page-filename
@@ -72,39 +75,38 @@
     (format "page-%d.%s" ndx out-ext)))
 
 (defn- freemarker-transformer
-  [config]
-  (let [theme-dir  (as-file config :theme)
+  []
+  (let [theme-dir  (as-file :theme)
         fmt-config (freemarker/make-config theme-dir)]
     (partial freemarker/render fmt-config)))
 
 (defn- make-writer
-  [config]
-  (let [output (output-dir config)]
-    (partial u/write-file output)))
+  []
+  (partial u/write-file (output-dir)))
 
 (defn- prepare-notes
-  [config noembed]
-  (let [base-url        (get-in config [:general :base-url])
-        transform       (partial transform-note base-url noembed)
-        date-format     (get-in config [:general :date-format])
+  []
+  (let [base-url        (get-in *config* [:general :base-url])
+        transform       (partial transform-note base-url)
+        date-format     (get-in *config* [:general :date-format])
         date-formatter  (u/local-formatter date-format)]
     (pmap #(assoc %
              :link        (format "%s%s.%s" base-url (:slug %) out-ext)
              :parsed-date (u/parse-date date-formatter (:date %)))
-      (filter #(not (:draft %)) (pmap transform (note-files config))))))
+      (filter #(not (:draft %)) (pmap transform (note-files))))))
 
 (defn- render-everything
-  [config noembed]
-  (let [rss-count       (get-in config [:general :rss :count])
-        pages-dir       (as-file config :pages)
-        writer          (make-writer config)
-        global-vars     (assoc (:vars config)
+  []
+  (let [rss-count       (get-in *config* [:general :rss :count])
+        pages-dir       (as-file :pages)
+        writer          (make-writer)
+        global-vars     (assoc (:vars *config*)
                           :statique statique-string
                           :statique-link statique-link)
-        to-html         (freemarker-transformer config)]
+        to-html         (freemarker-transformer)]
     (do
-      (let [notes           (prepare-notes config noembed)
-            notes-per-page  (get-in config [:general :notes-per-page])
+      (let [notes           (prepare-notes)
+            notes-per-page  (get-in *config* [:general :notes-per-page])
             recent-notes    (take 10 notes)]
         ; write single notes
         (log/info (count (pmap (comp
@@ -131,7 +133,7 @@
                   "pages were written")
         ; write rss feeds
         (when (> rss-count 0)
-          (let [feeds (get-in config [:general :rss :feeds])]
+          (let [feeds (get-in *config* [:general :rss :feeds])]
             (pmap (comp
                     writer
                     #(assoc %
@@ -146,8 +148,8 @@
       ; write standalone pages
       (when (.exists pages-dir)
         (let [pages     (u/sorted-files pages-dir :postfix ".md")
-              base-url  (get-in config [:general :base-url])
-              from-md   (partial transform-file base-url noembed)]
+              base-url  (get-in *config* [:general :base-url])
+              from-md   (partial transform-file base-url)]
           (log/info (count (pmap (comp
                                    writer
                                    #(assoc {}
@@ -162,41 +164,40 @@
                     "standalone pages were written"))))))
 
 (defn make-noembed
-  [config]
-  (noembed/make-noembed (as-file config :cache)))
+  []
+  (noembed/make-noembed (as-file :cache)))
 
 (defn- render
-  [config]
-  (let [noembed (make-noembed config)]
+  []
+  (binding [*noembed* (make-noembed)]
     (do
       (doall
-        (render-everything config noembed))
-      (.save noembed))))
+        (render-everything))
+      (.save *noembed*))))
 
 (defn- copy
-  [config file]
-  (let [root (:root config)
-        out  (output-dir config)
+  [file]
+  (let [root (:root *config*)
+        out  (output-dir)
         f    (io/file root file)]
     (if (.isDirectory f)
       (fs/copy-dir f out)
       (fs/copy f (io/file out (fs/base-name file))))))
 
 (defn- copy-static
-  [config]
-  (when-let [ds (get-in config [:general :copy])]
-    (let [cp (partial copy config)]
+  []
+  (when-let [ds (get-in *config* [:general :copy])]
+    (let [cp (partial copy)]
       (log/info (count (pmap cp ds)) "files/dirs were copied"))))
 
 (defn- clean
-  [config]
-  (let [out (output-dir config)]
-    (fs/delete-dir out)))
+  []
+  (fs/delete-dir (output-dir)))
 
 (defn build
   [blog-config]
-  (let [config (merge-with into defaults/config blog-config)]
+  (binding [*config* (merge-with into defaults/config blog-config)]
     (do
-      (clean config)
-      (render config)
-      (copy-static config))))
+      (clean)
+      (render)
+      (copy-static))))

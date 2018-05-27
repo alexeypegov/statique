@@ -15,7 +15,7 @@
   "Exits returing a given status and (optionally) prints some message"
   [status & s]
   (when (seq? s)
-    (long-string s))
+    (apply log/info s))
   (System/exit status))
 
 (defn working-dir

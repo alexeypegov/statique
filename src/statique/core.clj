@@ -58,21 +58,21 @@
     (or (:debug options) (Boolean/parseBoolean (System/getProperty "debug")))
     (log/set-level :debug)))
 
+(defn- validate-root
+  [root]
+  (if (not (blog-dir? root))
+    (u/exit 1 (format "Can not find '%s' at '%s'" config-name (.getPath root)))
+    (log/info (format "Root '%s'" (.getPath root)))))
+
 (defn- execute-command
   [args options]
   (let [command (keyword (string/lower-case (first args)))
         root    (:blog-dir options)]
     (case command
-      :build (build root)
-      (println (format "Сommand '%s' is not supported [yet]" (first args))))))
-
-(defn- validate-root
-  [options]
-  (let [root (:blog-dir options)]
-    (if (not (blog-dir? root))
-      (u/exit 1
-            (format "Can not find '%s' at '%s'" config-name (.getPath root)))
-      (log/debug (format "Root '%s'" (.getPath root))))))
+      :build (do
+        (validate-root root)
+        (build root))
+      (log/info (format "Unknown command '%s'" (first args))))))
 
 (defn -main
   [& args]
@@ -82,6 +82,5 @@
       (:help options) (u/exit 0 (usage summary))
       errors          (u/exit 1 errors))
     (configure-debug-logging options)
-    (validate-root options)
     (execute-command (if (empty? arguments) ["build"] arguments) options)
     (u/exit 0)))
