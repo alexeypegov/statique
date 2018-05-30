@@ -13,7 +13,7 @@
                  [http-kit "2.2.0"]
                  [org.clojure/data.json "0.2.6"]
                  [me.raynes/fs "1.4.6"]
-                 [clj-time "0.14.3"]
+                 [clj-time "0.14.4"]
                  [org.clojure/tools.cli "0.3.7"]]
   :plugins [[lein-pprint "1.2.0"]
             [lein-difftest "2.0.0"]

@@ -1,8 +1,9 @@
 (ns statique.util
   (:require [clojure.java.io :as io]
             [clojure.string :as string]
-            [clj-time.format :as timef]
-            [clj-time.coerce :as timec]
+            [clj-time.core :as t]
+            [clj-time.format :as f]
+            [clj-time.coerce :as c]
             [statique.logging :as log])
   (:import java.util.Properties))
 
@@ -50,12 +51,14 @@
 (defn local-formatter
   "Creates local date/time formatter"
   [date-format]
-  (timef/formatter-local date-format))
+  (f/with-zone
+    (f/formatter-local date-format)
+    (t/default-time-zone)))
 
 (defn parse-date
   "Parses local date/time using given formatter"
   [formatter s]
-  (timec/to-date (timef/parse formatter s)))
+  (c/to-date (f/parse formatter s)))
 
 (defn write-file
   "Writes given content to a filename placed in the given directory
