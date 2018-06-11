@@ -39,7 +39,7 @@
     (.getName file2)))
 
 (defn sorted-files
-  "Returns sequence of files within the given directory optionally filtered by a postfix"
+  "Returns sorted sequence of files within the given directory optionally filtered by a postfix"
   [dir & {:keys [postfix]}]
   {:pre [(instance? java.io.File dir) (.isDirectory dir)]}
   (sort

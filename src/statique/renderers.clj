@@ -103,11 +103,12 @@
   (reify PostProcessor
     (^Node process [_ ^Node node]
       (.accept node (link-visitor))
-      (.accept node (image-visitor base-url))
+      (when base-url
+        (.accept node (image-visitor base-url)))
       node)))
 
 (defn media-extension
-  [base-url noembed]
+  [noembed base-url]
   (reify
     Parser$ParserExtension
     (^void extend

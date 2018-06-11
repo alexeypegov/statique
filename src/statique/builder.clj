@@ -57,7 +57,7 @@
 
 (defn- transform-file
   [base-url file]
-  (let [links-extension (renderers/media-extension base-url *noembed*)]
+  (let [links-extension (renderers/media-extension *noembed* base-url)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
       :file file)))
@@ -85,27 +85,25 @@
   (partial u/write-file (output-dir)))
 
 (defn- prepare-notes
-  []
-  (let [base-url        (get-in *config* [:general :base-url])
-        transform       (partial transform-note base-url)
+  [files & {:keys [base-url] :or {base-url nil}}]
+  (let [transform       (partial transform-note base-url)
         date-format     (get-in *config* [:general :date-format])
         date-formatter  (u/local-formatter date-format)]
     (pmap #(assoc %
              :link        (format "%s%s.%s" base-url (:slug %) out-ext)
              :parsed-date (u/parse-date date-formatter (:date %)))
-      (filter #(not (:draft %)) (pmap transform (note-files))))))
+      (filter #(not (:draft %)) (pmap transform files)))))
 
 (defn- render-everything
   []
-  (let [rss-count       (get-in *config* [:general :rss :count])
-        pages-dir       (as-file :pages)
+  (let [pages-dir       (as-file :pages)
         writer          (make-writer)
         global-vars     (assoc (:vars *config*)
                           :statique statique-string
                           :statique-link statique-link)
         to-html         (freemarker-transformer)]
     (do
-      (let [notes           (prepare-notes)
+      (let [notes           (prepare-notes (note-files))
             notes-per-page  (get-in *config* [:general :notes-per-page])
             recent-notes    (take 10 notes)]
         ; write single notes
@@ -130,10 +128,13 @@
                                     :vars global-vars
                                     :recent recent-notes))
                                (note-pages notes-per-page notes)))
-                  "pages were written")
-        ; write rss feeds
+                  "pages were written"))
+      ; write rss feeds
+      (let [rss-count (get-in *config* [:general :rss :count])]
         (when (> rss-count 0)
-          (let [feeds (get-in *config* [:general :rss :feeds])]
+          (let [base-url  (get-in *config* [:general :base-url])
+                notes     (take rss-count (prepare-notes (note-files) :base-url base-url))
+                feeds     (get-in *config* [:general :rss :feeds])]
             (pmap (comp
                     writer
                     #(assoc %
@@ -141,7 +142,7 @@
                        :filename (format "%s.%s" (get % :template) "xml"))
                     #(assoc {}
                        :vars global-vars
-                       :items (take rss-count notes)
+                       :items notes
                        :template %))
                   feeds)
             (log/info (count feeds) "RSS feeds were written"))))
