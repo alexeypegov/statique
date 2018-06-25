@@ -9,6 +9,7 @@
             [statique.noembed :as noembed]
             [statique.logging :as log]
             [statique.util :as u]
+            [statique.fs :as fs2]
             [me.raynes.fs :as fs]))
 
 (def encoding         "UTF-8")
@@ -21,6 +22,7 @@
 
 (def ^:dynamic *noembed* nil)
 (def ^:dynamic *config* nil)
+(def ^:dynamic *fs* nil)
 
 (defn- slug
   [file]
@@ -179,26 +181,32 @@
 (defn- copy
   [file]
   (let [root (:root *config*)
-        out  (output-dir)
-        f    (io/file root file)]
-    (if (.isDirectory f)
-      (fs/copy-dir f out)
-      (fs/copy f (io/file out (fs/base-name file))))))
+        dst  (output-dir)
+        src  (io/file root file)]
+    (.copy *fs* src dst)))
 
 (defn- copy-static
   []
   (when-let [ds (get-in *config* [:general :copy])]
-    (let [cp (partial copy)]
-      (log/info (count (pmap cp ds)) "files/dirs were copied"))))
+    (log/info (reduce + 0 (pmap copy ds)) "static files were copied")))
 
 (defn- clean
   []
   (fs/delete-dir (output-dir)))
 
+(defn build-fs
+  [config]
+  (let [root (:root config)
+        cache-dir (io/file root (get-in config [:general :cache]))]
+    (fs2/make-fs root cache-dir)))
+
 (defn build
   [blog-config]
-  (binding [*config* (merge-with into defaults/config blog-config)]
-    (do
-      (clean)
-      (render)
-      (copy-static))))
+  (let [config (merge-with into defaults/config blog-config)]
+    (binding [*config*  config
+              *fs*      (build-fs config)]
+      (do
+        (clean)
+        (render)
+        (copy-static)
+        (.save *fs*)))))
