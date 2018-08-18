@@ -5,7 +5,8 @@
             [clj-time.format :as f]
             [clj-time.coerce :as c]
             [statique.logging :as log])
-  (:import java.util.Properties))
+  (:import java.util.Properties)
+  (:import [java.nio.file Path Paths]))
 
 (defn long-string
   "Conctenates given strings using newline character"
@@ -91,7 +92,7 @@
   (let [file        (io/as-file path)
         data        (read-edn file)
         write-cache (atom {})]
-    (log/debug (count data) "entries were read from" (.getPath file))
+    (log/debug (count data) "entries were read from" (.getName file))
     (reify FileCache
       (getCached [_ k]
            (let [v (or (get data k) (producer k))]
@@ -100,7 +101,7 @@
       (save [_]
             (.mkdirs (.getParentFile file))
             (spit file (with-out-str (pr @write-cache)))
-            (log/debug (count @write-cache) "entries were cached to" (.getPath file))))))
+            (log/debug (count @write-cache) "entries were cached to" (.getName file))))))
 
 (defn get-version
   [dep]
@@ -111,3 +112,9 @@
       (with-open [stream (io/input-stream props)]
         (let [props (doto (Properties.) (.load stream))]
           (.getProperty props "version"))))))
+
+(defn relative-path
+  [root file]
+  (.toString (.relativize
+               (.toPath (io/as-file root))
+               (.toPath file))))
