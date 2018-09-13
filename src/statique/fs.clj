@@ -2,13 +2,17 @@
   (:require [clojure.java.io :as io]
             [statique.util :as u]
             [statique.logging :as log]
+            [statique.cache :as c]
             [me.raynes.fs :as fs]))
 
-(def ^:private cache-name "timestamp.edn")
+(def ^:private cache-ext ".edn")
+(def ^:private cache-name (str "timestamp" cache-ext))
 
 (defprotocol BlogFileSystem
   (copy [this src dst-dir])
   (info [this file])
+  (make-cache [this name] [this name producer-fn])
+  (relative [this file])
   (save [this]))
 
 (defn- list-files
@@ -20,55 +24,55 @@
 
 (defn- file-info
   [root-dir file cache]
-  (let [relative  (u/relative-path root-dir file)]
+  (let [relative  (u/relative-path root-dir file)
+        cached-ts (.read-v cache relative 0)
+        timestamp (.lastModified file)]
+    (.write-v cache relative timestamp)
     (assoc {}
-      :relative relative
-      :timestamp (.lastModified file)
-      :cached-timestamp (get (:read cache) relative 0)
-      :src file)))
+      :relative         relative
+      :timestamp        timestamp
+      :cached-timestamp cached-ts
+      :src              file)))
 
 (defn- copy-info-fn
   [root-dir src dst cache]
   (fn [file]
-    (let [info      (file-info root-dir file cache)
-          dst-file  (io/file dst (u/relative-path (.getParent src) file))
-          exists    (.exists dst-file)]
-      (assoc info
-        :exists exists
-        :outdated (or (not exists) (not= (:timestamp info) (:cached-timestamp info)))
-        :dst dst-file))))
+    (assoc (file-info root-dir file cache)
+      :dst (io/file dst (u/relative-path (.getParent src) file)))))
 
 (def copy
   (fn [m]
-    (if (:outdated m)
-      (fs/copy+ (:src m) (:dst m)))
-    m))
-
-(defn- update-cache-fn
-  [cache]
-  (fn [m]
-    (swap! (:write cache) assoc (:relative m) (:timestamp m))
-    m))
+    (let [exists      (.exists (:dst m))
+          ts-mismatch (not= (:timestamp m) (:cached-timestamp m))]
+      (if (or (not exists) ts-mismatch)
+        (do
+          (fs/copy+ (:src m) (:dst m))
+          m)
+        nil))))
 
 (defn- make-copier
   [root-dir src dst cache]
   (comp
-    (update-cache-fn cache)
     copy
     (copy-info-fn root-dir src dst cache)))
 
 (defn make-fs
   [root-dir cache-dir]
   (let [cache-file  (io/file cache-dir cache-name)
-        cache       {:read (u/read-edn cache-file) :write (atom {})}]
+        cache       (c/make-file-cache cache-file)]
     (reify BlogFileSystem
-      (copy [this src dst_dir]
-            (let [copier (make-copier root-dir src dst_dir cache)]
-              (reduce #(if (:outdated %2) (inc %1) %1) 0
-                (map copier (list-files src)))))
-      (info [_ file] (file-info root-dir file cache))
-      (save [this]
-            (.mkdirs cache-dir)
-            (spit cache-file (with-out-str (pr @(:write cache))))
-            (log/debug (count @(:write cache))
-                       "entries were written to" (u/relative-path cache-dir cache-file))))))
+      (copy [_ src dst-dir]
+            (let [copier (make-copier root-dir src dst-dir cache)]
+              (count
+                (filter #(not= % nil)
+                  (map copier (list-files src))))))
+      (info [_ file]
+            (file-info root-dir file cache))
+      (make-cache [_ name]
+                  (u/make-file-cache (io/file cache-dir (str name cache-ext))))
+      (make-cache [_ name producer-fn]
+                  (u/make-file-cache (io/file cache-dir (str name cache-ext)) :producer-fn producer-fn))
+      (relative [_ file]
+                (u/relative-path root-dir file))
+      (save [_]
+            (.save cache)))))

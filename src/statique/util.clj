@@ -74,6 +74,15 @@
         (.write w content)
         (.getPath file)))))
 
+(defn write-file-2
+  [path content]
+  (let [file (io/file path)]
+    (do
+      (.mkdirs (.getParentFile file))
+      (with-open [w (io/writer file)]
+        (.write w content)
+        (.getPath file)))))
+
 (defn read-edn
   "Reads EDN from the given file, returns default object if empty or no file"
   [path & {:keys [default] :or {default {}}}]
@@ -81,27 +90,6 @@
     (if (.exists file)
       (read-string (slurp file))
       default)))
-
-(defprotocol FileCache
-  (getCached [this k])
-  (save [this]))
-
-(defn make-file-cache
-  "Creates a file-based EDN cache given a path and a producer function"
-  [path producer]
-  (let [file        (io/as-file path)
-        data        (read-edn file)
-        write-cache (atom {})]
-    (log/debug (count data) "entries were read from" (.getName file))
-    (reify FileCache
-      (getCached [_ k]
-           (let [v (or (get data k) (producer k))]
-            (swap! write-cache assoc k v)
-            v))
-      (save [_]
-            (.mkdirs (.getParentFile file))
-            (spit file (with-out-str (pr @write-cache)))
-            (log/debug (count @write-cache) "entries were cached to" (.getName file))))))
 
 (defn get-version
   [dep]
@@ -118,3 +106,17 @@
   (.toString (.relativize
                (.toPath (io/as-file root))
                (.toPath file))))
+
+(defn paged-seq
+  ([page-size col]
+    (paged-seq page-size col 1))
+  ([page-size col index]
+    (lazy-seq
+      (when (seq col)
+        (let [items (take page-size col)
+              rest  (drop page-size col)]
+            (cons
+              {:index index
+               :items items
+               :next? (not (empty? rest))}
+              (paged-seq page-size rest (inc index))))))))

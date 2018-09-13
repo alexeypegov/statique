@@ -6,7 +6,6 @@
             [statique.markdown :as markdown]
             [statique.freemarker :as freemarker]
             [statique.renderers :as renderers]
-            [statique.noembed :as noembed]
             [statique.logging :as log]
             [statique.util :as u]
             [statique.fs :as fs2]
@@ -20,7 +19,6 @@
 (def statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                               statique-string))
 
-(def ^:dynamic *noembed* nil)
 (def ^:dynamic *config* nil)
 (def ^:dynamic *fs* nil)
 
@@ -59,7 +57,7 @@
 
 (defn- transform-file
   [base-url file]
-  (let [links-extension (renderers/media-extension *noembed* base-url)]
+  (let [links-extension (renderers/media-extension base-url)]
     (assoc
       (markdown/transform (slurp file) :extensions links-extension)
       :file file)))
@@ -166,17 +164,10 @@
                                  pages))
                     "standalone pages were written"))))))
 
-(defn make-noembed
-  []
-  (noembed/make-noembed (as-file :cache)))
-
 (defn- render
   []
-  (binding [*noembed* (make-noembed)]
-    (do
-      (doall
-        (render-everything))
-      (.save *noembed*))))
+  (doall
+    (render-everything)))
 
 (defn- copy
   [file]
@@ -203,8 +194,8 @@
 (defn build
   [blog-config]
   (let [config (merge-with into defaults/config blog-config)]
-    (binding [*config*  config
-              *fs*      (build-fs config)]
+    (binding [*config*        config
+              *fs*            (build-fs config)]
       (do
         (clean)
         (render)

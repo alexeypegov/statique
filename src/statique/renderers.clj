@@ -1,5 +1,6 @@
 (ns statique.renderers
-  (:require [clojure.string :as s])
+  (:require [clojure.string :as s]
+            [statique.noembed :as n])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -66,9 +67,9 @@
              :else (proxy-super visitChildren node)))))
 
 (defn- write-media-html
-  [node noembed writer]
+  [node writer]
   (let [url   (.getUrl node)
-        data  (.getCached noembed url)
+        data  (n/noembed url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
@@ -85,18 +86,17 @@
         (.tag "/a")))))
 
 (defn- media-node-renderer
-  [noembed context]
+  [context]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
       (^void render [_ ^Node node]
-             (write-media-html node noembed writer)))))
+             (write-media-html node writer)))))
 
-(defn- html-node-renderer-factory
-  [noembed]
+(def html-node-renderer-factory
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
-                   (media-node-renderer noembed context))))
+                   (media-node-renderer context))))
 
 (defn- post-processor
   [base-url]
@@ -108,7 +108,7 @@
       node)))
 
 (defn media-extension
-  [noembed base-url]
+  [base-url]
   (reify
     Parser$ParserExtension
     (^void extend
@@ -117,4 +117,4 @@
     HtmlRenderer$HtmlRendererExtension
     (^void extend
       [_ ^HtmlRenderer$Builder rendererBuilder]
-      (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed)))))
+      (.nodeRendererFactory rendererBuilder html-node-renderer-factory))))
