@@ -187,17 +187,16 @@
 
 (defn build-fs
   [config]
-  (let [root (:root config)
-        cache-dir (io/file root (get-in config [:general :cache]))]
-    (fs2/make-fs root cache-dir)))
+  (let [root-dir  (:root config)
+        cache-dir (io/file root-dir (get-in config [:general :cache]))]
+    (fs2/make-fs root-dir cache-dir)))
 
 (defn build
   [blog-config]
   (let [config (merge-with into defaults/config blog-config)]
-    (binding [*config*        config
-              *fs*            (build-fs config)]
-      (do
+    (with-open [fs (build-fs config)]
+      (binding [*config*  config
+                *fs*      fs]
         (clean)
         (render)
-        (copy-static)
-        (.save *fs*)))))
+        (copy-static)))))

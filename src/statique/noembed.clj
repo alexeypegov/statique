@@ -9,8 +9,7 @@
 
 (defn noembed
   [url]
-  (let [options {:query-params {:url url}}
-        {:keys [status headers body error] :as resp} @(http/get noembed-url options)]
-    (if error
-      nil
+  (let [options               {:query-params {:url url}}
+        {:keys [body error]}  @(http/get noembed-url options)]
+    (if-not error
       (json/read-str body :key-fn keyword))))

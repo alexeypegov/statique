@@ -16,7 +16,7 @@
 (defn exit
   "Exits returing a given status and (optionally) prints some message"
   [status & s]
-  (when (seq? s)
+  (when (string? s)
     (apply log/info s))
   (System/exit status))
 
@@ -77,11 +77,10 @@
 (defn write-file-2
   [path content]
   (let [file (io/file path)]
-    (do
-      (.mkdirs (.getParentFile file))
-      (with-open [w (io/writer file)]
-        (.write w content)
-        (.getPath file)))))
+    (.mkdirs (.getParentFile file))
+    (with-open [w (io/writer file)]
+      (.write w content)
+      (.getPath file))))
 
 (defn read-edn
   "Reads EDN from the given file, returns default object if empty or no file"
@@ -93,10 +92,8 @@
 
 (defn get-version
   [dep]
-  (let [path (str "META-INF/maven/" (or (namespace dep) (name dep))
-                  "/" (name dep) "/pom.properties")
-        props (io/resource path)]
-    (when props
+  (let [path  (str "META-INF/maven/" (or (namespace dep) (name dep)) "/" (name dep) "/pom.properties")]
+    (when-let [props (io/resource path)]
       (with-open [stream (io/input-stream props)]
         (let [props (doto (Properties.) (.load stream))]
           (.getProperty props "version"))))))
@@ -112,7 +109,7 @@
     (paged-seq page-size col 1))
   ([page-size col index]
     (lazy-seq
-      (when (seq col)
+      (when (seq? col)
         (let [items (take page-size col)
               rest  (drop page-size col)]
             (cons

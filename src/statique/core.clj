@@ -2,7 +2,7 @@
   (:require [slingshot.slingshot :only [throw+]]
             [clojure.java.io :as io]
             [clojure.string :as string]
-            [statique.builder :as builder]
+            [statique.builder2 :as builder]
             [statique.logging :as log]
             [statique.util :as u]
             [yaml.core :as yaml]

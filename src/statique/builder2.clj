@@ -1,39 +1,52 @@
 (ns statique.builder2
-  )
+  (:require
+    [clojure.java.io :as io]
+    [statique.util :as u]
+    [statique.logging :as log]
+    [statique.notes :as n]
+    [statique.defaults :as defaults]
+    [statique.fs :as fs]))
 
-(def ^:dynamic *fs* nil)
-(def ^:dynamic *config* nil)
-(def ^:dynamic *global-vars* nil)
+(def ^:private statique-version (u/get-version 'statique))
+(def ^:private statique-string  (format "Statique %s" statique-version))
+(def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
+                                        statique-string))
 
-(defmulti render-item #(class %))
+(defn- transform-file
+  [base-url file]
+  (let [links-extension (renderers/media-extension base-url)]
+    (assoc
+      (markdown/transform (slurp file) :extensions links-extension)
+      :file file)))
 
-(defmethod render-item statique.notes.Note
+(defn- render-single-note
   [note]
-  (log/debug "note" (:src note)))
+  (log/debug "note to generate" (:src note)))
 
-(defmethod render-item statique.notes.Page
-  [page]
-  (log/debug "page" (:index page)))
+(defn- make-global-vars
+  [vars]
+  (assoc vars
+    :statique       statique-string
+    :statique-link  statique-link))
 
-(defn- render
-  []
-  (doall
-    (map
-      render-item
-      (n/outdated-items
-                  *fs*
-                  (as-file :notes)
-                  (output-dir)
-                  (get-in *config* [:general :notes-per-page])))))
+(defn- as-file
+  [config key]
+  (let [root-dir (:root config)
+        value (get-in config [:general key])]
+    (io/file root-dir value)))
+
+(defn build-fs
+  [config]
+  (let [root-dir    (io/as-file (:root config))
+        cache-dir   (as-file config :cache)
+        notes-dir   (as-file config :notes)
+        output-dir  (as-file config :output)]
+    (fs/make-blog-fs
+      (fs/make-dirs root-dir cache-dir notes-dir output-dir))))
 
 (defn build
   [blog-config]
   (let [config (merge-with into defaults/config blog-config)]
-    (binding [*config*        config
-              *fs*            (build-fs config)
-              *global-vars*   (assoc (:vars config)
-                                :statique statique-string
-                                :statique-link statique-link)]
-      (do
-        (render)
-        (.save *fs*)))))
+    (with-open [fs          (build-fs config)]
+      (let [global-vars (make-global-vars (:vars config))]
+        (doall (map render-single-note (n/outdated-single-notes fs)))))))

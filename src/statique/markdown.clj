@@ -15,8 +15,9 @@
   [front-matter-visitor]
   (let [data    (.getData front-matter-visitor)
         mapper  (fn [[k v]] {(keyword (s/lower-case k))
-                             (if (some #(= k %) array-values) v
-                                 (first v))})]
+                             (if (some #(= k %) array-values)
+                               v
+                               (first v))})]
     (merge
       {:draft false}
       (into {} (map mapper data)))))
@@ -33,6 +34,5 @@
         front-matter-visitor  (YamlFrontMatterVisitor.)
         node                  (.parse parser s)
         body                  (.render renderer node)]
-    (do
-      (.accept node front-matter-visitor)
-      (make-note front-matter-visitor body))))
+    (.accept node front-matter-visitor)
+    (make-note front-matter-visitor body)))

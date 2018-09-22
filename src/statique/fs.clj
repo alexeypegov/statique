@@ -5,15 +5,25 @@
             [statique.cache :as c]
             [me.raynes.fs :as fs]))
 
-(def ^:private cache-ext ".edn")
-(def ^:private cache-name (str "timestamp" cache-ext))
+(def ^:private markdown-ext   ".md")
+(def ^:private cache-ext      ".edn")
+(def ^:private cache-name     (str "timestamp" cache-ext))
 
 (defprotocol BlogFileSystem
-  (copy [this src dst-dir])
   (info [this file])
-  (make-cache [this name] [this name producer-fn])
+  (copy [this src dst-dir])
   (relative [this file])
-  (save [this]))
+  (notes [this])
+  (output-dir [this])
+  (make-cache [this name] [this name producer-fn])
+  (close [this]))
+
+(defrecord NoteInfo [relative timestamp cached-timestamp src])
+(defrecord Directories [root cache notes output])
+
+(defn make-dirs
+  [root cache notes output]
+  (->Directories root cache notes output))
 
 (defn- list-files
   [file-or-dir]
@@ -25,14 +35,10 @@
 (defn- file-info
   [root-dir file cache]
   (let [relative  (u/relative-path root-dir file)
-        cached-ts (.read-v cache relative 0)
+        cached-ts (.get cache relative 0)
         timestamp (.lastModified file)]
-    (.write-v cache relative timestamp)
-    (assoc {}
-      :relative         relative
-      :timestamp        timestamp
-      :cached-timestamp cached-ts
-      :src              file)))
+    (.put cache relative timestamp)
+    (->NoteInfo relative timestamp cached-ts file)))
 
 (defn- copy-info-fn
   [root-dir src dst cache]
@@ -56,23 +62,29 @@
     copy
     (copy-info-fn root-dir src dst cache)))
 
-(defn make-fs
-  [root-dir cache-dir]
-  (let [cache-file  (io/file cache-dir cache-name)
+(defn make-blog-fs
+  [^Directories dirs]
+  (let [cache-file  (io/file (:cache dirs) cache-name)
         cache       (c/make-file-cache cache-file)]
     (reify BlogFileSystem
       (copy [_ src dst-dir]
-            (let [copier (make-copier root-dir src dst-dir cache)]
-              (count
-                (filter #(not= % nil)
-                  (map copier (list-files src))))))
+            (let [copier (make-copier (:root dirs) src dst-dir cache)]
+              (filter #(not= % nil)
+                  (map copier (list-files src)))))
       (info [_ file]
-            (file-info root-dir file cache))
+            (file-info (:root dirs) file cache))
       (make-cache [_ name]
-                  (u/make-file-cache (io/file cache-dir (str name cache-ext))))
+                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext))))
       (make-cache [_ name producer-fn]
-                  (u/make-file-cache (io/file cache-dir (str name cache-ext)) :producer-fn producer-fn))
+                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext)) :producer-fn producer-fn))
       (relative [_ file]
-                (u/relative-path root-dir file))
-      (save [_]
-            (.save cache)))))
+                (u/relative-path (:root dirs) file))
+      (output-dir [_]
+                  (:output dirs))
+      (notes [this]
+             (map
+               #(.info this %)
+               (reverse
+                 (u/sorted-files (:notes dirs) :postfix markdown-ext))))
+      (close [_]
+            (.close cache)))))

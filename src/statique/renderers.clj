@@ -27,8 +27,7 @@
   [node]
   (let [text (.getLiteral node)]
     (when (url? text)
-      (let [url (java.net.URL. text)
-            host (.getHost url)]
+      (let [host (.getHost (java.net.URL. text))]
         (cond
           (some #(s/ends-with? host %) media-services)
             (doto node
