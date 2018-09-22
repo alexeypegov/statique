@@ -38,7 +38,7 @@
         cached-ts (.get cache relative 0)
         timestamp (.lastModified file)]
     (.put cache relative timestamp)
-    (->NoteInfo relative timestamp cached-ts file)))
+    (NoteInfo. relative timestamp cached-ts file)))
 
 (defn- copy-info-fn
   [root-dir src dst cache]
@@ -85,6 +85,6 @@
              (map
                #(.info this %)
                (reverse
-                 (u/sorted-files (:notes dirs) :postfix markdown-ext))))
+                 (u/sorted-files (:notes dirs) markdown-ext))))
       (close [_]
             (.close cache)))))

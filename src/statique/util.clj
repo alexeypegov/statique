@@ -5,8 +5,12 @@
             [clj-time.format :as f]
             [clj-time.coerce :as c]
             [statique.logging :as log])
-  (:import java.util.Properties)
-  (:import [java.nio.file Path Paths]))
+  (:import [java.nio.file Path Paths]
+           [java.util Properties]))
+
+(defn working-dir
+  []
+  (System/getProperty "user.dir"))
 
 (defn long-string
   "Conctenates given strings using newline character"
@@ -19,11 +23,6 @@
   (when (string? s)
     (apply log/info s))
   (System/exit status))
-
-(defn working-dir
-  "Returns current working directory"
-  []
-  (System/getProperty "user.dir"))
 
 (defn postfix-filter
   "Creates a postfix filename filter for File::listFiles"
@@ -41,13 +40,14 @@
 
 (defn sorted-files
   "Returns sorted sequence of files within the given directory optionally filtered by a postfix"
-  [dir & {:keys [postfix]}]
-  {:pre [(instance? java.io.File dir) (.isDirectory dir)]}
-  (sort
-    file-comparator
-    (if postfix
-      (.listFiles dir (postfix-filter postfix))
-      (.listFiles dir))))
+  ([dir] (sorted-files dir nil))
+  ([dir postfix]
+    {:pre [(instance? java.io.File dir) (.isDirectory dir)]}
+    (sort
+      file-comparator
+      (if postfix
+        (.listFiles dir (postfix-filter postfix))
+        (.listFiles dir)))))
 
 (defn local-formatter
   "Creates local date/time formatter"
@@ -84,11 +84,12 @@
 
 (defn read-edn
   "Reads EDN from the given file, returns default object if empty or no file"
-  [path & {:keys [default] :or {default {}}}]
-  (let [file (io/as-file path)]
-    (if (.exists file)
-      (read-string (slurp file))
-      default)))
+  ([path] (read-edn path {}))
+  ([path default]
+    (let [file (io/as-file path)]
+      (if (.exists file)
+        (read-string (slurp file))
+        default))))
 
 (defn get-version
   [dep]

@@ -40,7 +40,7 @@
 
 (defn- make-note
   [info]
-  (->Note (:src info) (:dst info)))
+  (Note. (:src info) (:dst info)))
 
 (defn- make-single-note-info
   [fs infos]

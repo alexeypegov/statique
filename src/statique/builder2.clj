@@ -5,23 +5,43 @@
     [statique.logging :as log]
     [statique.notes :as n]
     [statique.defaults :as defaults]
-    [statique.fs :as fs]))
+    [statique.fs :as fs]
+    [statique.renderers :as r]
+    [statique.markdown :as md]
+    [statique.freemarker :as fm]))
 
 (def ^:private statique-version (u/get-version 'statique))
 (def ^:private statique-string  (format "Statique %s" statique-version))
 (def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                                         statique-string))
 
-(defn- transform-file
-  [base-url file]
-  (let [links-extension (renderers/media-extension base-url)]
-    (assoc
-      (markdown/transform (slurp file) :extensions links-extension)
-      :file file)))
+(def ^:private ^:dynamic *context* nil)
+
+(defrecord Context [global-vars fmt-config media-extension date-formatter])
+
+#_(defn- freemarker-transformer
+  []
+  (let [theme-dir  (as-file :theme)
+        fmt-config (fm/make-config theme-dir)]
+    (partial f/render fmt-config)))
+
+#_(defn- prepare-notes
+  [files & {:keys [base-url] :or {base-url nil}}]
+  (let [transform       (partial transform-note base-url)
+        date-format     (get-in *config* [:general :date-format])
+        date-formatter  (u/local-formatter date-format)]
+    (pmap #(assoc %
+             :link        (format "%s%s.%s" base-url (:slug %) out-ext)
+             :parsed-date (u/parse-date date-formatter (:date %)))
+      (filter #(not (:draft %)) (pmap transform files)))))
 
 (defn- render-single-note
-  [note]
-  (log/debug "note to generate" (:src note)))
+  [info]
+  (let [note-text (slurp (:src info))
+        extension (:media-extension *context*)
+        note      (md/transform note-text extension)]
+    (when-not (:draft note)
+      (log/debug (:title note)))))
 
 (defn- make-global-vars
   [vars]
@@ -47,6 +67,11 @@
 (defn build
   [blog-config]
   (let [config (merge-with into defaults/config blog-config)]
-    (with-open [fs          (build-fs config)]
-      (let [global-vars (make-global-vars (:vars config))]
-        (doall (map render-single-note (n/outdated-single-notes fs)))))))
+    (with-open [fs (build-fs config)]
+      (let [global-vars     (make-global-vars (:vars config))
+            fmt-config      (fm/make-config (as-file config :theme))
+            date-format     (get-in config [:general :date-format])
+            date-formatter  (u/local-formatter date-format)
+            note-extension  (r/media-extension)]
+        (binding [*context* (Context. global-vars fmt-config note-extension date-formatter)]
+          (doall (map render-single-note (n/outdated-single-notes fs))))))))

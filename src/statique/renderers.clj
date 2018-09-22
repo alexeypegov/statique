@@ -107,13 +107,14 @@
       node)))
 
 (defn media-extension
-  [base-url]
-  (reify
-    Parser$ParserExtension
-    (^void extend
-      [_ ^Parser$Builder parserBuilder]
-      (.postProcessor parserBuilder (post-processor base-url)))
-    HtmlRenderer$HtmlRendererExtension
-    (^void extend
-      [_ ^HtmlRenderer$Builder rendererBuilder]
-      (.nodeRendererFactory rendererBuilder html-node-renderer-factory))))
+  ([] (media-extension nil))
+  ([base-url]
+    (reify
+      Parser$ParserExtension
+      (^void extend
+        [_ ^Parser$Builder parserBuilder]
+        (.postProcessor parserBuilder (post-processor base-url)))
+      HtmlRenderer$HtmlRendererExtension
+      (^void extend
+        [_ ^HtmlRenderer$Builder rendererBuilder]
+        (.nodeRendererFactory rendererBuilder html-node-renderer-factory)))))

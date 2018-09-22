@@ -27,12 +27,13 @@
   (assoc (prepare-meta front-matter-visitor) :body body))
 
 (defn transform
-  [s & {:keys [extensions] :or {extensions []}}]
-  (let [es                    (flatten (concat default-extensions (list extensions)))
-        parser                (.build (.extensions (Parser/builder) es))
-        renderer              (.build (.extensions (HtmlRenderer/builder) es))
-        front-matter-visitor  (YamlFrontMatterVisitor.)
-        node                  (.parse parser s)
-        body                  (.render renderer node)]
-    (.accept node front-matter-visitor)
-    (make-note front-matter-visitor body)))
+  ([s] (transform s []))
+  ([s extensions]
+    (let [es                    (flatten (concat default-extensions (list extensions)))
+          parser                (.build (.extensions (Parser/builder) es))
+          renderer              (.build (.extensions (HtmlRenderer/builder) es))
+          front-matter-visitor  (YamlFrontMatterVisitor.)
+          node                  (.parse parser s)
+          body                  (.render renderer node)]
+      (.accept node front-matter-visitor)
+      (make-note front-matter-visitor body))))
