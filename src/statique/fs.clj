@@ -73,10 +73,10 @@
                   (map copier (list-files src)))))
       (info [_ file]
             (file-info (:root dirs) file cache))
-      (make-cache [_ name]
-                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext))))
+      (make-cache [this name]
+                  (.make-cache this name nil))
       (make-cache [_ name producer-fn]
-                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext)) :producer-fn producer-fn))
+                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext)) producer-fn))
       (relative [_ file]
                 (u/relative-path (:root dirs) file))
       (output-dir [_]
