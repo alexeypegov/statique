@@ -14,26 +14,11 @@
 (def ^:private statique-string  (format "Statique %s" statique-version))
 (def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                                         statique-string))
+(def ^:private output-ext       ".html")
 
 (def ^:private ^:dynamic *context* nil)
 
-(defrecord Context [global-vars fmt-config media-extension date-formatter])
-
-#_(defn- freemarker-transformer
-  []
-  (let [theme-dir  (as-file :theme)
-        fmt-config (fm/make-config theme-dir)]
-    (partial f/render fmt-config)))
-
-#_(defn- prepare-notes
-  [files & {:keys [base-url] :or {base-url nil}}]
-  (let [transform       (partial transform-note base-url)
-        date-format     (get-in *config* [:general :date-format])
-        date-formatter  (u/local-formatter date-format)]
-    (pmap #(assoc %
-             :link        (format "%s%s.%s" base-url (:slug %) out-ext)
-             :parsed-date (u/parse-date date-formatter (:date %)))
-      (filter #(not (:draft %)) (pmap transform files)))))
+(defrecord Context [global-vars fmt-config media-extension date-formatter base-url])
 
 (defn- render-single-note
   [info]
@@ -41,7 +26,18 @@
         extension (:media-extension *context*)
         note      (md/transform note-text extension)]
     (when-not (:draft note)
-      (log/debug (:title note)))))
+      (log/debug (:title note) "->" (:dst info))
+      (let [parsed-date (u/parse-date (:date-formatter *context*) (:date note))
+            base-url    (:base-url *context*)
+            note-slug   (:slug info)
+            note-link   (str (or base-url "/") note-slug output-ext)
+            fmt-config  (:fmt-config *context*)]
+        (u/write-file-2
+          (:dst info)
+          (fm/render fmt-config "note" {:note        (assoc note :slug note-slug)
+                                        :vars        (:global-vars *context*)
+                                        :link        note-link
+                                        :parsed-date parsed-date}))))))
 
 (defn- make-global-vars
   [vars]
@@ -70,8 +66,9 @@
     (with-open [fs (build-fs config)]
       (let [global-vars     (make-global-vars (:vars config))
             fmt-config      (fm/make-config (as-file config :theme))
+            base-url        (get-in config [:general :base-url])
             date-format     (get-in config [:general :date-format])
             date-formatter  (u/local-formatter date-format)
             note-extension  (r/media-extension)]
-        (binding [*context* (Context. global-vars fmt-config note-extension date-formatter)]
+        (binding [*context* (Context. global-vars fmt-config note-extension date-formatter nil)]
           (doall (map render-single-note (n/outdated-single-notes fs))))))))

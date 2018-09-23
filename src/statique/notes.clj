@@ -8,16 +8,18 @@
 (def ^:private markdown-ext ".md")
 
 (defrecord Page [index notes next?])
-(defrecord Note [src dst])
+(defrecord Note [src dst slug])
 
 (defn- slug
   [file]
   (s/lower-case (s/replace (.getName file) markdown-ext "")))
 
-(defn- add-note-destination
+(defn- add-note-destination-and-slug
   [output-dir info]
-  (let [filename (format "%s.%s" (slug (:src info)) out-ext)]
+  (let [slug      (slug (:src info))
+        filename  (format "%s.%s" slug out-ext)]
     (assoc info
+      :slug slug
       :dst (io/file output-dir filename))))
 
 (defn- add-destination-outdated-flag
@@ -40,12 +42,13 @@
 
 (defn- make-note
   [info]
-  (Note. (:src info) (:dst info)))
+  (let [{:keys [src dst slug]} info]
+    (Note. src dst slug)))
 
 (defn- make-single-note-info
   [fs infos]
   (let [output-dir          (.output-dir fs)
-        add-destination-fn  (partial add-note-destination output-dir)]
+        add-destination-fn  (partial add-note-destination-and-slug output-dir)]
     (map (comp
            add-destination-outdated-flag
            add-destination-fn
