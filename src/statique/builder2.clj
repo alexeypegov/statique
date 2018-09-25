@@ -10,11 +10,12 @@
     [statique.markdown :as markdown]
     [statique.freemarker :as freemarker]))
 
+(def ^:private output-ext       ".html")
+
 (def ^:private statique-version (util/get-version 'statique))
 (def ^:private statique-string  (format "Statique %s" statique-version))
 (def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                                         statique-string))
-(def ^:private output-ext       ".html")
 
 (def ^:private ^:dynamic *context* nil)
 
@@ -22,19 +23,17 @@
 
 (defn- render-single-note
   [{:keys [src dst slug]}]
-  (let [note-text                           (slurp src)
-        extension                           (:media-extension *context*)
-        {:keys [draft title date] :as note} (markdown/transform note-text extension)]
+  (let [note-text (slurp src)
+        {:keys [media-extension date-formatter base-url fmt-config global-vars]} *context*
+        {:keys [draft title date] :as note} (markdown/transform note-text media-extension)]
     (when-not draft
       (log/debug title "->" dst)
-      (let [parsed-date (util/parse-date (:date-formatter *context*) date)
-            base-url    (:base-url *context*)
-            note-link   (str (or base-url "/") slug output-ext)
-            fmt-config  (:fmt-config *context*)]
+      (let [parsed-date (util/parse-date date-formatter date)
+            note-link   (str (or base-url "/") slug output-ext)]
         (util/write-file-2
           dst
           (freemarker/render fmt-config "note" {:note        (assoc note :slug slug)
-                                                :vars        (:global-vars *context*)
+                                                :vars        global-vars
                                                 :link        note-link
                                                 :parsed-date parsed-date}))))))
 
