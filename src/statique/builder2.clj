@@ -25,7 +25,7 @@
   [{:keys [src dst slug]}]
   (let [note-text (slurp src)
         {:keys [media-extension date-formatter base-url fmt-config global-vars]} *context*
-        {:keys [draft title date] :as note} (markdown/transform note-text media-extension)]
+        {:keys [draft title date], :as note} (markdown/transform note-text media-extension)]
     (when-not draft
       (log/debug title "->" dst)
       (let [parsed-date (util/parse-date date-formatter date)
@@ -48,10 +48,8 @@
     :statique-link  statique-link))
 
 (defn- as-file
-  [config key]
-  (let [root-dir (:root config)
-        value (get-in config [:general key])]
-    (io/file root-dir value)))
+  [{:keys [root general]} key]
+  (io/file root (key general)))
 
 (defn build-fs
   [config]
@@ -63,18 +61,15 @@
       (fs/make-dirs root-dir cache-dir notes-dir output-dir))))
 
 (defn build
-  [blog-config]
+  [{vars :vars, {:keys [base-url date-format notes-per-page]} :general, :as blog-config}]
   (let [config (defaults/with-defaults blog-config)]
     (with-open [fs (build-fs config)]
-      (let [global-vars     (make-global-vars (:vars config))
+      (let [global-vars     (make-global-vars vars)
             fmt-config      (freemarker/make-config (as-file config :theme))
-            base-url        (get-in config [:general :base-url])
-            date-format     (get-in config [:general :date-format])
             date-formatter  (util/local-formatter date-format)
-            note-extension  (renderers/media-extension)
-            page-size       (get-in config [:general :notes-per-page])]
+            note-extension  (renderers/media-extension)]
         (binding [*context* (->Context global-vars fmt-config note-extension date-formatter nil)]
           (doseq [note (notes/outdated-single-notes fs)]
             (render-single-note note))
-          #_(doseq [page (notes/outdated-pages fs page-size)]
+          #_(doseq [page (notes/outdated-pages fs notes-per-page)]
             (render-page page)))))))

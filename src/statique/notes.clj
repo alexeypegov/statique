@@ -13,7 +13,7 @@
     (s/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
 (defn- note-info
-  [output-dir {:keys [src timestamp cached-timestamp] :as note}]
+  [output-dir {:keys [src timestamp cached-timestamp], :as note}]
   (let [slug            (slug src)
         filename        (str slug out-ext)
         dst             (io/file output-dir filename)
@@ -35,12 +35,12 @@
   (u/paged-seq
     page-size
     (map
-      (fn [{:keys [timestamp cached-timestamp] :as info}]
+      (fn [{:keys [timestamp cached-timestamp], :as info}]
         (assoc info :outdated (not= timestamp cached-timestamp)))
       (.note-files fs))))
 
 (defn- page-info
-  [fs {:keys [items] :as info}]
+  [fs {items :items, :as info}]
   (if-let [has-outdated-note (some :outdated items)]
     (assoc info :outdated true)
     (if-let [cache-outdated false] ; todo!!!

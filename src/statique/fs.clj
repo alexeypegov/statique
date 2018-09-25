@@ -47,7 +47,7 @@
       :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file)))))
 
 (def copy
-  (fn [{:keys [src dst timestamp cached-timestamp] :as info}]
+  (fn [{:keys [src dst timestamp cached-timestamp], :as info}]
     (let [not-exists  (not (.exists dst))
           ts-mismatch (not= timestamp cached-timestamp)]
       (when (or not-exists ts-mismatch)
@@ -61,7 +61,7 @@
     (copy-info-fn root-dir cache src-dir dst-dir)))
 
 (defn make-blog-fs
-  [^Directories {:keys [root cache output notes] :as dirs}]
+  [^Directories {:keys [root cache output notes], :as dirs}]
   (let [closeables        (atom '())
         timestamps-file   (io/file cache cache-name)
         timestamps-cache  (cache/file-cache timestamps-file)
