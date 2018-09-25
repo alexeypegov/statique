@@ -1,6 +1,6 @@
 (ns statique.cache
   (:require [clojure.java.io :as io]
-            [statique.util :as u]
+            [statique.util :as util]
             [statique.logging :as log])
   (:refer-clojure :rename {get map-get}))
 
@@ -9,13 +9,14 @@
   (put [this k v]))
 
 (defprotocol FileCache
+  "Is made compatible with Closeable to let use with 'with-open'"
   (close [this]))
 
-(defn make-file-cache
-  ([file] (make-file-cache file nil))
-  ([file producer-fn]
+(defn file-cache
+  ([file] (file-cache file nil))
+  ([file producer]
     (let [c-file  (io/as-file file)
-          r-data  (u/read-edn file)
+          r-data  (util/read-edn file)
           w-data  (atom {})]
       (log/debug (count r-data) "entries were read from" file)
       (reify
@@ -23,9 +24,9 @@
         (get [this k]
              (.get this k nil))
         (get [this k d]
-                (if producer-fn
+                (if producer
                   (let [cache-value (map-get r-data k :not-found)
-                        result      (if (= cache-value :not-found) (producer-fn k) cache-value)]
+                        result      (if (= cache-value :not-found) (producer k) cache-value)]
                     (.put this k result)
                     result)
                   (map-get r-data k)))

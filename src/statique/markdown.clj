@@ -24,7 +24,8 @@
 
 (defn- make-note
   [front-matter-visitor body]
-  (assoc (prepare-meta front-matter-visitor) :body body))
+  (assoc (prepare-meta front-matter-visitor)
+    :body body))
 
 (defn transform
   ([s] (transform s []))

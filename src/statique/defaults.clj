@@ -1,6 +1,6 @@
 (ns statique.defaults)
 
-(def config
+(def ^:private default-config
   {:general {:notes           "notes/"
              :theme           "theme/"
              :output          "./out/"
@@ -14,3 +14,7 @@
              :pages           nil
              :keep            nil}
    :vars {}})
+
+(defn with-defaults
+  [config]
+  (merge-with into default-config config))

@@ -11,5 +11,5 @@
   [url]
   (let [options               {:query-params {:url url}}
         {:keys [body error]}  @(http/get noembed-url options)]
-    (if-not error
+    (when-not error
       (json/read-str body :key-fn keyword))))

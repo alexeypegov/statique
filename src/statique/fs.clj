@@ -1,24 +1,24 @@
 (ns statique.fs
   (:require [clojure.java.io :as io]
-            [statique.util :as u]
+            [statique.util :as util]
             [statique.logging :as log]
-            [statique.cache :as c]
+            [statique.cache :as cache]
             [me.raynes.fs :as fs]))
 
-(def ^:private markdown-ext   ".md")
-(def ^:private cache-ext      ".edn")
-(def ^:private cache-name     (str "timestamp" cache-ext))
+(def ^:private markdown-ext ".md")
+(def ^:private cache-ext    ".edn")
+(def ^:private cache-name   (str "timestamp" cache-ext))
 
 (defprotocol BlogFileSystem
   (info [this file])
   (copy [this src dst-dir])
   (relative [this file])
-  (notes [this])
+  (note-files [this])
   (output-dir [this])
-  (make-cache [this name] [this name producer-fn])
+  (cache [this name])
   (close [this]))
 
-(defrecord NoteInfo [relative timestamp cached-timestamp src])
+(defrecord FileInfo [relative timestamp cached-timestamp src])
 (defrecord Directories [root cache notes output])
 
 (defn make-dirs
@@ -33,58 +33,57 @@
       (list file))))
 
 (defn- file-info
-  [root-dir file cache]
-  (let [relative  (u/relative-path root-dir file)
+  [root-dir cache file]
+  (let [relative  (util/relative-path root-dir file)
         cached-ts (.get cache relative 0)
         timestamp (.lastModified file)]
     (.put cache relative timestamp)
-    (NoteInfo. relative timestamp cached-ts file)))
+    (->FileInfo relative timestamp cached-ts file)))
 
 (defn- copy-info-fn
-  [root-dir src dst cache]
+  [root-dir cache src-dir dst-dir]
   (fn [file]
     (assoc (file-info root-dir file cache)
-      :dst (io/file dst (u/relative-path (.getParent src) file)))))
+      :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file)))))
 
 (def copy
-  (fn [m]
-    (let [exists      (.exists (:dst m))
-          ts-mismatch (not= (:timestamp m) (:cached-timestamp m))]
-      (if (or (not exists) ts-mismatch)
-        (do
-          (fs/copy+ (:src m) (:dst m))
-          m)
-        nil))))
+  (fn [{:keys [src dst timestamp cached-timestamp] :as info}]
+    (let [not-exists  (not (.exists dst))
+          ts-mismatch (not= timestamp cached-timestamp)]
+      (when (or not-exists ts-mismatch)
+        (fs/copy+ src dst)
+        info))))
 
 (defn- make-copier
-  [root-dir src dst cache]
+  [root-dir cache src-dir dst-dir]
   (comp
     copy
-    (copy-info-fn root-dir src dst cache)))
+    (copy-info-fn root-dir cache src-dir dst-dir)))
 
 (defn make-blog-fs
-  [^Directories dirs]
-  (let [cache-file  (io/file (:cache dirs) cache-name)
-        cache       (c/make-file-cache cache-file)]
+  [^Directories {:keys [root cache output notes] :as dirs}]
+  (let [closeables        (atom '())
+        timestamps-file   (io/file cache cache-name)
+        timestamps-cache  (cache/file-cache timestamps-file)
+        info-fn           (partial file-info root timestamps-cache)]
+    (swap! closeables conj timestamps-cache)
     (reify BlogFileSystem
-      (copy [_ src dst-dir]
-            (let [copier (make-copier (:root dirs) src dst-dir cache)]
-              (filter #(not= % nil)
-                  (map copier (list-files src)))))
+      (copy [_ src-dir dst-dir]
+            (let [copier (make-copier root timestamps-cache src-dir dst-dir)]
+              (filter some?
+                  (map copier (list-files src-dir)))))
       (info [_ file]
-            (file-info (:root dirs) file cache))
-      (make-cache [this name]
-                  (.make-cache this name nil))
-      (make-cache [_ name producer-fn]
-                  (c/make-file-cache (io/file (:cache dirs) (str name cache-ext)) producer-fn))
+            (info-fn file))
+      (cache [this name]
+             (let [cache (cache/file-cache (io/file cache name))]
+               (swap! closeables conj cache)
+               cache))
       (relative [_ file]
-                (u/relative-path (:root dirs) file))
+                (util/relative-path root file))
       (output-dir [_]
-                  (:output dirs))
-      (notes [this]
-             (map
-               #(.info this %)
-               (reverse
-                 (u/sorted-files (:notes dirs) markdown-ext))))
+                  output)
+      (note-files [this]
+                  (map info-fn (reverse (util/sorted-files notes markdown-ext))))
       (close [_]
-            (.close cache)))))
+             (doseq [cache @closeables]
+               (.close cache))))))

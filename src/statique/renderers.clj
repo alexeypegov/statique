@@ -28,17 +28,15 @@
   (let [text (.getLiteral node)]
     (when (url? text)
       (let [host (.getHost (java.net.URL. text))]
-        (cond
-          (some #(s/ends-with? host %) media-services)
+        (if (some #(s/ends-with? host %) media-services)
+          (doto node
+            (.insertAfter (MediaNode. text))
+            (.unlink))
+          (let [link (Link. text nil)]
+            (.appendChild link (Text. text))
             (doto node
-              (.insertAfter (MediaNode. text))
-              (.unlink))
-          :else ; plain link
-            (let [link (Link. text nil)]
-              (.appendChild link (Text. text))
-              (doto node
-                (.insertAfter link)
-                (.unlink))))))))
+              (.insertAfter link)
+              (.unlink))))))))
 
 (defn- link-visitor
   []
@@ -60,10 +58,9 @@
   [base-url]
   (proxy [AbstractVisitor] []
     (visit [node]
-           (cond
-             (instance? Image node)
-              (.setDestination node (format "%s%s" base-url (.getDestination node)))
-             :else (proxy-super visitChildren node)))))
+           (if (instance? Image node)
+             (.setDestination node (format "%s%s" base-url (.getDestination node)))
+             (proxy-super visitChildren node)))))
 
 (defn- write-media-html
   [node writer]

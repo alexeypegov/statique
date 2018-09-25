@@ -4,85 +4,53 @@
             [statique.logging :as log]
             [statique.util :as u]))
 
-(def ^:private out-ext      "html")
+(def ^:private out-ext      ".html")
 (def ^:private markdown-ext ".md")
-
-(defrecord Page [index notes next?])
-(defrecord Note [src dst slug])
 
 (defn- slug
   [file]
-  (s/lower-case (s/replace (.getName file) markdown-ext "")))
+  (let [name (.getName file)]
+    (s/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
-(defn- add-note-destination-and-slug
-  [output-dir info]
-  (let [slug      (slug (:src info))
-        filename  (format "%s.%s" slug out-ext)]
-    (assoc info
-      :slug slug
-      :dst (io/file output-dir filename))))
-
-(defn- add-destination-outdated-flag
-  [info]
-  (assoc info
-    :destination-outdated (not (.exists (:dst info)))))
-
-(defn- render-outdated-notes
-  [info]
-  (if (:outdated info)
-    (do
-      (log/debug (:relative info))
-      info)))
-
-(defn- add-source-outdated-flag
-  [info]
-  (let [{:keys [timestamp cached-timestamp]} info]
-    (assoc info
-      :source-outdated (not= timestamp cached-timestamp))))
-
-(defn- make-note
-  [info]
-  (let [{:keys [src dst slug]} info]
-    (Note. src dst slug)))
-
-(defn- make-single-note-info
-  [fs infos]
-  (let [output-dir          (.output-dir fs)
-        add-destination-fn  (partial add-note-destination-and-slug output-dir)]
-    (map (comp
-           add-destination-outdated-flag
-           add-destination-fn
-           add-source-outdated-flag)
-         infos)))
+(defn- note-info
+  [output-dir {:keys [src timestamp cached-timestamp] :as note}]
+  (let [slug            (slug src)
+        filename        (str slug out-ext)
+        dst             (io/file output-dir filename)
+        dst-outdated    (not (.exists dst))
+        src-outdated    (not= timestamp cached-timestamp)]
+    (assoc note
+      :outdated (or src-outdated dst-outdated)
+      :dst      dst
+      :slug     slug)))
 
 (defn outdated-single-notes
   [fs]
-  (map make-note
-    (filter
-      #(if
-         (or
-           (:source-outdated %)
-           (:destination-outdated %))
-         %)
-      (make-single-note-info fs (.notes fs)))))
+  (let [output-dir    (.output-dir fs)
+        note-info-fn  (partial note-info output-dir)]
+    (filter :outdated (map note-info-fn (.note-files fs)))))
 
-(defn make-page
-  [info]
-  (->Page (:index info) (:items info) (:next? info)))
-
-(defn- add-page-outdated-flag
-  [info]
-  (if-let [outdated (some #(= true (:outdated %)) (:items info))]
-    (assoc info :outdated true)
-    (if-let [cache-outdated true]
-      (assoc info :outdated true)
-      info)))
-
-#_(defn outdated-page-notes
+(defn- paged-seq
   [fs page-size]
-  (map make-page
+  (u/paged-seq
+    page-size
+    (map
+      (fn [{:keys [timestamp cached-timestamp] :as info}]
+        (assoc info :outdated (not= timestamp cached-timestamp)))
+      (.note-files fs))))
+
+(defn- page-info
+  [fs {:keys [items] :as info}]
+  (if-let [has-outdated-note (some :outdated items)]
+    (assoc info :outdated true)
+    (if-let [cache-outdated false] ; todo!!!
+      info
+      (assoc info :outdated true))))
+
+(defn outdated-paged-notes
+  [fs page-size]
+  (let [output-dir    (.output-dir fs)
+        page-info-fn  (page-info fs output-dir)]
     (filter
-      #(if (:outdated %) %)
-      (map
-        add-page-outdated-flag
-        (u/paged-seq page-size (annotated-files (.notes fs)))))))
+      :outdated
+      (map page-info-fn (paged-seq page-size fs)))))
