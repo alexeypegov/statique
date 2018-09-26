@@ -109,12 +109,13 @@
   ([page-size col]
     (paged-seq page-size col 1))
   ([page-size col index]
-    (lazy-seq
-      (when (seq? col)
-        (let [items (take page-size col)
-              rest  (drop page-size col)]
-            (cons
-              {:index index
-               :items items
-               :next? (not (empty? rest))}
-              (paged-seq page-size rest (inc index))))))))
+   {:pre (seq? col)}
+   (lazy-seq
+     (when (not-empty col)
+       (let [items (take page-size col)
+             rest  (drop page-size col)]
+         (cons
+           {:index index
+            :items items
+            :next? (not (empty? rest))}
+           (paged-seq page-size rest (inc index))))))))

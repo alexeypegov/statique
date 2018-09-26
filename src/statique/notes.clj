@@ -13,18 +13,18 @@
     (s/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
 (defn- note-info
-  [output-dir {:keys [src timestamp cached-timestamp], :as note}]
+  [output-dir {:keys [src crc cached-crc], :as note}]
   (let [slug            (slug src)
         filename        (str slug out-ext)
         dst             (io/file output-dir filename)
         dst-outdated    (not (.exists dst))
-        src-outdated    (not= timestamp cached-timestamp)]
+        src-outdated    (not= crc cached-crc)]
     (assoc note
       :outdated (or src-outdated dst-outdated)
       :dst      dst
       :slug     slug)))
 
-(defn outdated-single-notes
+(defn outdated-notes
   [fs]
   (let [output-dir    (.output-dir fs)
         note-info-fn  (partial note-info output-dir)]
@@ -35,22 +35,37 @@
   (u/paged-seq
     page-size
     (map
-      (fn [{:keys [timestamp cached-timestamp], :as info}]
-        (assoc info :outdated (not= timestamp cached-timestamp)))
+      (fn [{:keys [crc cached-crc], :as info}]
+        (assoc info :outdated (not= crc cached-crc)))
       (.note-files fs))))
 
-(defn- page-info
-  [fs {items :items, :as info}]
-  (if-let [has-outdated-note (some :outdated items)]
-    (assoc info :outdated true)
-    (if-let [cache-outdated false] ; todo!!!
-      info
-      (assoc info :outdated true))))
+(defn- page-filename
+  [ndx]
+  (let [prefix (if (= 1 ndx) "index" (str "page-" ndx))]
+    (str prefix out-ext)))
 
-(defn outdated-paged-notes
+(defn- page-items
+  [items]
+  (map #(select-keys % [:relative]) items))
+
+(defn- page-info
+  [page-cache output-dir {items :items, index :index, :as page}]
+  (let [has-outdated-notes  (some :outdated items)
+        dst                 (io/file output-dir (page-filename index))
+        dst-outdated        (not (.exists dst))
+        cached-items        (.get page-cache index)
+        page-items          (page-items items)
+        cached-outdated     (not= cached-items page-items)]
+    (.put page-cache index page-items)
+    (assoc page
+      :dst dst
+      :outdated (or has-outdated-notes dst-outdated cached-outdated))))
+
+(defn outdated-pages
   [fs page-size]
   (let [output-dir    (.output-dir fs)
-        page-info-fn  (page-info fs output-dir)]
+        page-cache    (.cache fs "pages")
+        page-info-fn  (partial page-info page-cache output-dir)]
     (filter
       :outdated
-      (map page-info-fn (paged-seq page-size fs)))))
+      (map page-info-fn (paged-seq fs page-size)))))

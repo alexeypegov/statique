@@ -19,8 +19,6 @@
 
 (def ^:private ^:dynamic *context* nil)
 
-(defrecord Context [global-vars fmt-config media-extension date-formatter base-url])
-
 (defn- render-single-note
   [{:keys [src dst slug]}]
   (let [note-text (slurp src)
@@ -38,8 +36,8 @@
                                                 :parsed-date parsed-date}))))))
 
 (defn- render-page
-  [info]
-  (log/debug "page"))
+  [{index :index}]
+  (log/debug "page" index))
 
 (defn- make-global-vars
   [vars]
@@ -64,12 +62,11 @@
   [{vars :vars, {:keys [base-url date-format notes-per-page]} :general, :as blog-config}]
   (let [config (defaults/with-defaults blog-config)]
     (with-open [fs (build-fs config)]
-      (let [global-vars     (make-global-vars vars)
-            fmt-config      (freemarker/make-config (as-file config :theme))
-            date-formatter  (util/local-formatter date-format)
-            note-extension  (renderers/media-extension)]
-        (binding [*context* (->Context global-vars fmt-config note-extension date-formatter nil)]
-          (doseq [note (notes/outdated-single-notes fs)]
-            (render-single-note note))
-          #_(doseq [page (notes/outdated-pages fs notes-per-page)]
-            (render-page page)))))))
+      (binding [*context* {:global-vars     (make-global-vars vars)
+                           :fmt-config      (freemarker/make-config (as-file config :theme))
+                           :date-formatter  (util/local-formatter date-format)
+                           :media-extension (renderers/media-extension)}]
+        #_(doseq [note (notes/outdated-notes fs)]
+          (render-single-note note))
+        (doseq [page (notes/outdated-pages fs notes-per-page)]
+          (render-page page))))))
