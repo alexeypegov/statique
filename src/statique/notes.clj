@@ -44,17 +44,13 @@
   (let [prefix (if (= 1 ndx) "index" (str "page-" ndx))]
     (str prefix out-ext)))
 
-(defn- page-items
-  [items]
-  (map #(select-keys % [:relative]) items))
-
 (defn- page-info
   [page-cache output-dir {items :items, index :index, :as page}]
   (let [has-outdated-notes  (some :outdated items)
         dst                 (io/file output-dir (page-filename index))
         dst-outdated        (not (.exists dst))
         cached-items        (.get page-cache index)
-        page-items          (page-items items)
+        page-items          (map :relative items)
         cached-outdated     (not= cached-items page-items)]
     (.put page-cache index page-items)
     (assoc page

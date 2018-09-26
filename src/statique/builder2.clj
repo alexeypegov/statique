@@ -36,8 +36,8 @@
                                                 :parsed-date parsed-date}))))))
 
 (defn- render-page
-  [{index :index}]
-  (log/debug "page" index))
+  [{index :index, dst :dst}]
+  (log/debug index "->" dst))
 
 (defn- make-global-vars
   [vars]
