@@ -1,21 +1,14 @@
 (ns statique.notes
   (:require [clojure.java.io :as io]
-            [clojure.string :as s]
             [statique.logging :as log]
-            [statique.util :as u]))
+            [statique.util :as util]))
 
 (def ^:private out-ext      ".html")
 (def ^:private markdown-ext ".md")
 
-(defn- slug
-  [file]
-  (let [name (.getName file)]
-    (s/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
-
 (defn- note-info
-  [output-dir {:keys [src crc cached-crc], :as note}]
-  (let [slug            (slug src)
-        filename        (str slug out-ext)
+  [output-dir {:keys [src slug crc cached-crc], :as note}]
+  (let [filename        (str slug out-ext)
         dst             (io/file output-dir filename)
         dst-outdated    (not (.exists dst))
         src-outdated    (not= crc cached-crc)]
@@ -32,7 +25,7 @@
 
 (defn- paged-seq
   [fs page-size]
-  (u/paged-seq
+  (util/paged-seq
     page-size
     (map
       (fn [{:keys [crc cached-crc], :as info}]

@@ -19,6 +19,7 @@
                                v
                                (first v))})]
     (merge
+      ; todo: draft mode is not supported
       {:draft false}
       (into {} (map mapper data)))))
 

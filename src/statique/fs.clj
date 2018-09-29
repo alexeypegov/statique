@@ -1,5 +1,6 @@
 (ns statique.fs
   (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [statique.util :as util]
             [statique.logging :as log]
             [statique.cache :as cache]
@@ -19,8 +20,13 @@
   (cache [this name])
   (close [this]))
 
-(defrecord FileInfo [relative crc cached-crc src])
+(defrecord FileInfo [relative slug crc cached-crc src])
 (defrecord Directories [root cache notes output])
+
+(defn- slug
+  [file]
+  (let [name (.getName file)]
+    (string/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
 (defn make-dirs
   [root cache notes output]
@@ -37,9 +43,10 @@
   [root-dir cache file]
   (let [relative    (util/relative-path root-dir file)
         cached-crc  (.get cache relative 0)
-        crc         (crc/crc32 file)]
+        crc         (crc/crc32 file)
+        slug        (slug file)]
     (.put cache relative crc)
-    (->FileInfo relative crc cached-crc file)))
+    (->FileInfo relative slug crc cached-crc file)))
 
 (defn- copy-info-fn
   [root-dir cache src-dir dst-dir]
