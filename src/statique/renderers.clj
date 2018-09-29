@@ -1,6 +1,7 @@
 (ns statique.renderers
-  (:require [clojure.string :as s]
-            [statique.noembed :as n])
+  (:require [clojure.string :as string]
+            [statique.noembed :as noembed]
+            [statique.logging :as log])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -19,8 +20,8 @@
   "Checks whatever s is an URL, i.e. starts with URL prefix"
   [s]
   (or
-    (s/starts-with? s "http://")
-    (s/starts-with? s "https://")))
+    (string/starts-with? s "http://")
+    (string/starts-with? s "https://")))
 
 (defn- process-link-node
   "Checks whatever given node is an URL and replaces it with a MediaNode if needed"
@@ -28,7 +29,7 @@
   (let [text (.getLiteral node)]
     (when (url? text)
       (let [host (.getHost (java.net.URL. text))]
-        (if (some #(s/ends-with? host %) media-services)
+        (if (some #(string/ends-with? host %) media-services)
           (doto node
             (.insertAfter (MediaNode. text))
             (.unlink))
@@ -65,7 +66,7 @@
 (defn- write-media-html
   [node writer]
   (let [url   (.getUrl node)
-        data  (n/noembed url)
+        data  (noembed/fetch url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
@@ -103,6 +104,7 @@
         (.accept node (image-visitor base-url)))
       node)))
 
+; todo get rid of base-url
 (defn media-extension
   ([] (media-extension nil))
   ([base-url]

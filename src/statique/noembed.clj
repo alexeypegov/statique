@@ -1,15 +1,19 @@
 (ns statique.noembed
   (:require [org.httpkit.client :as http]
             [clojure.data.json :as json]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [statique.logging :as log])
   (:import [clojure.lang Atom]
            [java.io File]))
 
 (def ^:private noembed-url  "http://noembed.com/embed")
 
-(defn noembed
+(defn fetch
   [url]
   (let [options               {:query-params {:url url}}
         {:keys [body error]}  @(http/get noembed-url options)]
     (when-not error
-      (json/read-str body :key-fn keyword))))
+      (try
+        (json/read-str body :key-fn keyword)
+        (catch Throwable e
+          nil)))))

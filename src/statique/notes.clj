@@ -13,15 +13,20 @@
         dst-outdated    (not (.exists dst))
         src-outdated    (not= crc cached-crc)]
     (assoc note
-      :outdated (or src-outdated dst-outdated)
-      :dst      dst
-      :slug     slug)))
+      :src-outdated src-outdated
+      :outdated     (or src-outdated dst-outdated)
+      :dst          dst
+      :slug         slug)))
 
-(defn outdated-notes
+(defn all-notes
   [fs]
   (let [output-dir    (.output-dir fs)
         note-info-fn  (partial note-info output-dir)]
-    (filter :outdated (map note-info-fn (.note-files fs)))))
+    (map note-info-fn (.note-files fs))))
+
+(defn outdated-notes
+  [fs]
+  (filter :outdated (all-notes fs)))
 
 (defn- paged-seq
   [fs page-size]
