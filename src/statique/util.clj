@@ -1,12 +1,11 @@
 (ns statique.util
   (:require [clojure.java.io :as io]
-            [clojure.string :as string]
-            [clj-time.core :as t]
-            [clj-time.format :as f]
-            [clj-time.coerce :as c]
+            [clojure.string :as str]
+            [java-time :as time]
             [statique.logging :as log])
   (:import [java.nio.file Path Paths]
-           [java.util Properties]))
+           [java.util Properties]
+           [java.time.format DateTimeFormatter]))
 
 (defn working-dir
   []
@@ -15,7 +14,7 @@
 (defn long-string
   "Conctenates given strings using newline character"
   [& strings]
-  (clojure.string/join \newline strings))
+  (str/join \newline strings))
 
 (defn exit
   "Exits returing a given status and (optionally) prints some message"
@@ -29,7 +28,7 @@
   [^String postfix]
   (reify java.io.FilenameFilter
     (accept [this dir name]
-            (string/ends-with? name postfix))))
+            (str/ends-with? name postfix))))
 
 (defn file-comparator
   "Filename based file comparator"
@@ -49,17 +48,15 @@
         (.listFiles dir (postfix-filter postfix))
         (.listFiles dir)))))
 
-(defn local-formatter
-  "Creates local date/time formatter"
-  [date-format]
-  (f/with-zone
-    (f/formatter-local date-format)
-    (t/default-time-zone)))
-
-(defn parse-date
+(defn parse-local-date
   "Parses local date/time using given formatter"
-  [formatter s]
-  (c/to-date (f/parse formatter s)))
+  [format tz date]
+  (let [local-date (time/local-date format date)]
+    (.atStartOfDay local-date (time/zone-id tz))))
+
+(defn rfc-822
+  [datetime]
+  (.format DateTimeFormatter/RFC_1123_DATE_TIME datetime))
 
 (defn write-file
   "Writes given content to a filename placed in the given directory

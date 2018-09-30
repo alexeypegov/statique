@@ -23,17 +23,19 @@
 (def ^:private ^:dynamic *context* nil)
 
 (defn- prepare-note-item
-  [{:keys [src slug relative], :as item} {:keys [media-extension date-formatter note-cache]}]
+  [{:keys [src slug relative], :as item} {:keys [media-extension date-format tz note-cache]}]
   (if-let [cached-note (get @note-cache relative)]
     cached-note
     (let [note-text   (slurp src)
           transformed (markdown/transform note-text media-extension)
-          parsed-date (util/parse-date date-formatter (:date transformed))
+          parsed-date (util/parse-local-date date-format tz (:date transformed))
+          rfc-822     (util/rfc-822 parsed-date)
           note-link   (str "/" slug output-ext)
           note        (assoc transformed
                         :slug         slug
                         :link         note-link
-                        :parsed-date  parsed-date)]
+                        :parsed-date  parsed-date
+                        :rfc-822      rfc-822)]
       (swap! note-cache assoc relative note)
       note)))
 
@@ -107,13 +109,14 @@
       (fs/make-dirs root-dir cache-dir notes-dir output-dir))))
 
 (defn build
-  [{vars :vars, {:keys [base-url date-format notes-per-page], :as general} :general, :as blog-config}]
+  [{vars :vars, {:keys [base-url date-format notes-per-page tz], :as general} :general, :as blog-config}]
   (let [config (defaults/with-defaults blog-config)]
     (with-open [fs (build-fs config)]
       (binding [*context*   {:base-url        base-url
                              :global-vars     (make-global-vars vars)
                              :fmt-config      (freemarker/make-config (as-file config :theme))
-                             :date-formatter  (util/local-formatter date-format)
+                             :date-format     date-format
+                             :tz              tz
                              :media-extension (renderers/media-extension)
                              :note-cache      (atom {})}]
         (doseq [note (notes/outdated-notes fs)]
