@@ -1,15 +1,38 @@
 (ns statique.fs
   (:require [clojure.java.io :as io]
-            [statique.util :as u]
+            [clojure.string :as string]
+            [statique.util :as util]
             [statique.logging :as log]
-            [me.raynes.fs :as fs]))
+            [statique.cache :as cache]
+            [me.raynes.fs :as fs]
+            [pandect.algo.crc32 :as crc]))
 
-(def ^:private cache-name "timestamp.edn")
+(def ^:private markdown-ext ".md")
+(def ^:private cache-ext    ".edn")
+(def ^:private cache-name   (str "crc" cache-ext))
 
 (defprotocol BlogFileSystem
-  (copy [this src dst-dir])
   (info [this file])
-  (save [this]))
+  (copy-to-output [this src])
+  (relative [this file])
+  (note-files [this])
+  (page-files [this])
+  (output-dir [this])
+  (root-dir [this])
+  (cache [this name])
+  (close [this]))
+
+(defrecord FileInfo [relative slug crc cached-crc src])
+(defrecord Directories [root cache notes pages output])
+
+(defn- slug
+  [file]
+  (let [name (.getName file)]
+    (string/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
+
+(defn make-dirs
+  [root cache notes pages output]
+  (->Directories root cache notes pages output))
 
 (defn- list-files
   [file-or-dir]
@@ -19,56 +42,65 @@
       (list file))))
 
 (defn- file-info
-  [root-dir file cache]
-  (let [relative  (u/relative-path root-dir file)]
-    (assoc {}
-      :relative relative
-      :timestamp (.lastModified file)
-      :cached-timestamp (get (:read cache) relative 0)
-      :src file)))
+  [root-dir cache file]
+  (let [relative    (util/relative-path root-dir file)
+        cached-crc  (.get cache relative 0)
+        crc         (crc/crc32 file)
+        slug        (slug file)]
+    (.put cache relative crc)
+    (->FileInfo relative slug crc cached-crc file)))
 
 (defn- copy-info-fn
-  [root-dir src dst cache]
+  [root-dir cache src-dir dst-dir]
   (fn [file]
-    (let [info      (file-info root-dir file cache)
-          dst-file  (io/file dst (u/relative-path (.getParent src) file))
-          exists    (.exists dst-file)]
+    (let [info (file-info root-dir cache file)]
       (assoc info
-        :exists exists
-        :outdated (or (not exists) (not= (:timestamp info) (:cached-timestamp info)))
-        :dst dst-file))))
+        :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file))))))
 
-(def copy
-  (fn [m]
-    (if (:outdated m)
-      (fs/copy+ (:src m) (:dst m)))
-    m))
-
-(defn- update-cache-fn
-  [cache]
-  (fn [m]
-    (swap! (:write cache) assoc (:relative m) (:timestamp m))
-    m))
+(def ^:private copy
+  (fn [{:keys [src dst crc cached-crc], :as info}]
+    (let [not-exists    (not (.exists dst))
+          crc-mismatch  (not= crc cached-crc)]
+      (when (or not-exists crc-mismatch)
+        (fs/copy+ src dst)
+        info))))
 
 (defn- make-copier
-  [root-dir src dst cache]
+  [root-dir cache src-dir dst-dir]
   (comp
-    (update-cache-fn cache)
     copy
-    (copy-info-fn root-dir src dst cache)))
+    (copy-info-fn root-dir cache src-dir dst-dir)))
 
-(defn make-fs
-  [root-dir cache-dir]
-  (let [cache-file  (io/file cache-dir cache-name)
-        cache       {:read (u/read-edn cache-file) :write (atom {})}]
+(defn make-blog-fs
+  [^Directories {:keys [root cache output notes pages], :as dirs}]
+  (let [closeables  (atom '())
+        crc-file    (io/file cache cache-name)
+        crc-cache   (cache/file-cache crc-file)
+        info-fn     (partial file-info root crc-cache)]
+    (swap! closeables conj crc-cache)
     (reify BlogFileSystem
-      (copy [this src dst_dir]
-            (let [copier (make-copier root-dir src dst_dir cache)]
-              (reduce #(if (:outdated %2) (inc %1) %1) 0
-                (map copier (list-files src)))))
-      (info [_ file] (file-info root-dir file cache))
-      (save [this]
-            (.mkdirs cache-dir)
-            (spit cache-file (with-out-str (pr @(:write cache))))
-            (log/debug (count @(:write cache))
-                       "entries were written to" (u/relative-path cache-dir cache-file))))))
+      (copy-to-output [_ src]
+            (let [src-file  (io/file root src)
+                  copier    (make-copier root crc-cache src-file output)]
+              (count
+                (filter some?
+                        (map copier (list-files src-file))))))
+      (info [_ file]
+            (info-fn file))
+      (cache [this name]
+             (let [cache (cache/file-cache (io/file cache (str name cache-ext)))]
+               (swap! closeables conj cache)
+               cache))
+      (relative [_ file]
+                (util/relative-path root file))
+      (output-dir [_]
+                  output)
+      (root-dir [_]
+                root)
+      (note-files [this]
+                  (map info-fn (reverse (util/sorted-files notes markdown-ext))))
+      (page-files [this]
+                  (map info-fn (util/sorted-files pages markdown-ext)))
+      (close [_]
+             (doseq [cache @closeables]
+               (.close cache))))))

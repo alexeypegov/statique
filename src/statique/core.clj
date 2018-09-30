@@ -54,8 +54,7 @@
 
 (defn- configure-debug-logging
   [options]
-  (when
-    (or (:debug options) (Boolean/parseBoolean (System/getProperty "debug")))
+  (when (or (:debug options) (Boolean/parseBoolean (System/getProperty "debug")))
     (log/set-level :debug)))
 
 (defn- validate-root

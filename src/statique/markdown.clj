@@ -15,24 +15,27 @@
   [front-matter-visitor]
   (let [data    (.getData front-matter-visitor)
         mapper  (fn [[k v]] {(keyword (s/lower-case k))
-                             (if (some #(= k %) array-values) v
-                                 (first v))})]
+                             (if (some #(= k %) array-values)
+                               v
+                               (first v))})]
     (merge
+      ; todo: draft mode is not supported
       {:draft false}
       (into {} (map mapper data)))))
 
 (defn- make-note
   [front-matter-visitor body]
-  (assoc (prepare-meta front-matter-visitor) :body body))
+  (assoc (prepare-meta front-matter-visitor)
+    :body body))
 
 (defn transform
-  [s & {:keys [extensions] :or {extensions []}}]
-  (let [es                    (flatten (concat default-extensions (list extensions)))
-        parser                (.build (.extensions (Parser/builder) es))
-        renderer              (.build (.extensions (HtmlRenderer/builder) es))
-        front-matter-visitor  (YamlFrontMatterVisitor.)
-        node                  (.parse parser s)
-        body                  (.render renderer node)]
-    (do
+  ([s] (transform s []))
+  ([s extensions]
+    (let [es                    (flatten (concat default-extensions (list extensions)))
+          parser                (.build (.extensions (Parser/builder) es))
+          renderer              (.build (.extensions (HtmlRenderer/builder) es))
+          front-matter-visitor  (YamlFrontMatterVisitor.)
+          node                  (.parse parser s)
+          body                  (.render renderer node)]
       (.accept node front-matter-visitor)
       (make-note front-matter-visitor body))))

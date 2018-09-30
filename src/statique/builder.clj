@@ -1,212 +1,148 @@
 (ns statique.builder
-  (:require [slingshot.slingshot :only [throw+]]
-            [clojure.java.io :as io]
-            [clojure.string :as string]
-            [statique.defaults :as defaults]
-            [statique.markdown :as markdown]
-            [statique.freemarker :as freemarker]
-            [statique.renderers :as renderers]
-            [statique.noembed :as noembed]
-            [statique.logging :as log]
-            [statique.util :as u]
-            [statique.fs :as fs2]
-            [me.raynes.fs :as fs]))
+  (:require
+    [clojure.java.io :as io]
+    [statique.util :as util]
+    [statique.logging :as log]
+    [statique.notes :as notes]
+    [statique.defaults :as defaults]
+    [statique.fs :as fs]
+    [statique.renderers :as renderers]
+    [statique.markdown :as md]
+    [statique.freemarker :as fm]))
 
-(def encoding         "UTF-8")
-(def out-ext          "html")
-(def markdown-ext     ".md")
-(def statique-version (u/get-version 'statique))
-(def statique-string  (format "Statique %s" statique-version))
-(def statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
-                              statique-string))
+(def ^:private output-ext           ".html")
+(def ^:private rss-ext              ".xml")
+(def ^:private note-template        "note")
+(def ^:private page-template        "index")
+(def ^:private standalone-template  "page")
 
-(def ^:dynamic *noembed* nil)
-(def ^:dynamic *config* nil)
-(def ^:dynamic *fs* nil)
+(def ^:private statique-version (util/get-version 'statique))
+(def ^:private statique-string  (format "Statique %s" statique-version))
+(def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
+                                        statique-string))
 
-(defn- slug
-  [file]
-  (string/lower-case (string/replace (.getName file) markdown-ext "")))
+(def ^:private ^:dynamic *context* nil)
+
+(defn- prepare-note-item
+  [{:keys [src slug relative], :as item} {:keys [media-extension date-format tz note-cache]}]
+  (if-let [cached-note (get @note-cache relative)]
+    cached-note
+    (let [note-text   (slurp src)
+          transformed (md/transform note-text media-extension)
+          parsed-date (util/parse-local-date date-format tz (:date transformed))
+          rfc-822     (util/rfc-822 parsed-date)
+          note-link   (str "/" slug output-ext)
+          note        (assoc transformed
+                        :slug         slug
+                        :link         note-link
+                        :parsed-date  parsed-date
+                        :rfc-822      rfc-822)]
+      (swap! note-cache assoc relative note)
+      note)))
+
+(defn- render-single-note
+  [{:keys [src dst slug relative], :as item}]
+  (let [{:keys [fmt-config global-vars]}      *context*
+        {title :title, :as transformed-item}  (prepare-note-item item *context*)]
+    (log/debug title "->" dst)
+    (util/write-file
+      dst
+      (fm/render fmt-config note-template (assoc {}
+                                                    :note transformed-item
+                                                    :vars global-vars)))))
+
+(defn- render-page
+  [{index :index, dst :dst, items :items, next? :next?}]
+  (let [{:keys  [fmt-config global-vars media-extension note-cache]} *context*
+        transformed-items (map #(prepare-note-item % *context*) items)]
+    (log/debug "page" index "->" dst)
+    (util/write-file
+      dst
+      (fm/render fmt-config page-template {:vars  global-vars
+                                                   :items transformed-items
+                                                   :ndx   index
+                                                   :next  (if next? (inc index) -1)
+                                                   :prev  (if (> index 1) (dec index) -1)}))))
+
+(defn- transform-templates
+  [templates fs]
+  (let [output-dir (.output-dir fs)]
+    (map (fn [name]
+           (let [dst (io/file output-dir (str name rss-ext))]
+             {:name     name
+              :dst      dst
+              :outdated (not (.exists dst))})) templates)))
+
+(defn- render-rss
+  [{rss-count :count, templates :feeds} fs]
+  (when (not (empty? templates))
+    (let [items         (take rss-count (notes/all-notes fs))
+          has-outdated  (not (empty? (filter :src-outdated items)))
+          ts            (transform-templates templates fs)
+          ts-outdated   (not (empty? (filter :outdated ts)))]
+      (when (or has-outdated ts-outdated)
+        (let [transformed (map #(prepare-note-item % *context*) items)
+              {:keys [base-url fmt-config global-vars]} *context*]
+          (doseq [{:keys [name dst]} ts]
+            (util/write-file
+              dst
+              (fm/render fmt-config name {:vars     global-vars
+                                          :items    transformed
+                                          :base-url base-url}))))))))
+
+(defn- make-global-vars
+  [vars]
+  (assoc vars
+    :statique       statique-string
+    :statique-link  statique-link))
 
 (defn- as-file
-  [key]
-  (let [root-dir  (:root *config*)
-        general   (:general *config*)
-        name      (get general key)]
-    (io/file root-dir name)))
-
-(defn- output-dir
-  []
-  (as-file :output))
-
-(defn- note-files
-  []
-  (let [dir (as-file :notes)]
-    (reverse (u/sorted-files dir :postfix ".md"))))
-
-(defn- note-pages
-  [page-size col & {:keys [ndx] :or {ndx 1}}]
-  (lazy-seq
-    (when (seq col)
-      (let [items (take page-size col)
-            rest  (drop page-size col)
-            next? (not (empty? rest))]
-          (cons {:items (doall items)
-                 :ndx   ndx
-                 :next  (if next? (inc ndx) -1)
-                 :prev  (if (> ndx 1) (dec ndx) -1)}
-                (note-pages page-size rest :ndx (inc ndx)))))))
-
-(defn- transform-file
-  [base-url file]
-  (let [links-extension (renderers/media-extension *noembed* base-url)]
-    (assoc
-      (markdown/transform (slurp file) :extensions links-extension)
-      :file file)))
-
-(defn- transform-note
-  [base-url file]
-  (assoc
-    (transform-file base-url file)
-    :slug (slug file)))
-
-(defn- make-page-filename
-  [ndx]
-  (if (= ndx 1)
-    (format "index.%s" out-ext)
-    (format "page-%d.%s" ndx out-ext)))
-
-(defn- freemarker-transformer
-  []
-  (let [theme-dir  (as-file :theme)
-        fmt-config (freemarker/make-config theme-dir)]
-    (partial freemarker/render fmt-config)))
-
-(defn- make-writer
-  []
-  (partial u/write-file (output-dir)))
-
-(defn- prepare-notes
-  [files & {:keys [base-url] :or {base-url nil}}]
-  (let [transform       (partial transform-note base-url)
-        date-format     (get-in *config* [:general :date-format])
-        date-formatter  (u/local-formatter date-format)]
-    (pmap #(assoc %
-             :link        (format "%s%s.%s" base-url (:slug %) out-ext)
-             :parsed-date (u/parse-date date-formatter (:date %)))
-      (filter #(not (:draft %)) (pmap transform files)))))
-
-(defn- render-everything
-  []
-  (let [pages-dir       (as-file :pages)
-        writer          (make-writer)
-        global-vars     (assoc (:vars *config*)
-                          :statique statique-string
-                          :statique-link statique-link)
-        to-html         (freemarker-transformer)]
-    (do
-      (let [notes           (prepare-notes (note-files))
-            notes-per-page  (get-in *config* [:general :notes-per-page])
-            recent-notes    (take 10 notes)]
-        ; write single notes
-        (log/info (count (pmap (comp
-                                 writer
-                                 #(assoc %
-                                    :content (to-html "note" %)
-                                    :filename (format "%s.%s" (get-in % [:note :slug]) out-ext))
-                                 #(assoc {}
-                                    :vars global-vars
-                                    :note %
-                                    :recent recent-notes))
-                               notes))
-                  "notes were written")
-        ; write paged notes
-        (log/info (count (pmap (comp
-                                 writer
-                                 #(assoc %
-                                    :content (to-html "index" %)
-                                    :filename (make-page-filename (:ndx %)))
-                                 #(assoc %
-                                    :vars global-vars
-                                    :recent recent-notes))
-                               (note-pages notes-per-page notes)))
-                  "pages were written"))
-      ; write rss feeds
-      (let [rss-count (get-in *config* [:general :rss :count])]
-        (when (> rss-count 0)
-          (let [base-url  (get-in *config* [:general :base-url])
-                notes     (take rss-count (prepare-notes (note-files) :base-url base-url))
-                feeds     (get-in *config* [:general :rss :feeds])]
-            (pmap (comp
-                    writer
-                    #(assoc %
-                       :content (to-html (get % :template) %)
-                       :filename (format "%s.%s" (get % :template) "xml"))
-                    #(assoc {}
-                       :vars global-vars
-                       :items notes
-                       :template %))
-                  feeds)
-            (log/info (count feeds) "RSS feeds were written"))))
-      ; write standalone pages
-      (when (.exists pages-dir)
-        (let [pages     (u/sorted-files pages-dir :postfix ".md")
-              base-url  (get-in *config* [:general :base-url])
-              from-md   (partial transform-file base-url)]
-          (log/info (count (pmap (comp
-                                   writer
-                                   #(assoc {}
-                                      :content (to-html "page" %)
-                                      :filename (format "%s.%s"
-                                                        (fs/name (:file %))
-                                                        out-ext))
-                                   #(assoc %
-                                      :vars global-vars)
-                                   from-md)
-                                 pages))
-                    "standalone pages were written"))))))
-
-(defn make-noembed
-  []
-  (noembed/make-noembed (as-file :cache)))
-
-(defn- render
-  []
-  (binding [*noembed* (make-noembed)]
-    (do
-      (doall
-        (render-everything))
-      (.save *noembed*))))
-
-(defn- copy
-  [file]
-  (let [root (:root *config*)
-        dst  (output-dir)
-        src  (io/file root file)]
-    (.copy *fs* src dst)))
-
-(defn- copy-static
-  []
-  (when-let [ds (get-in *config* [:general :copy])]
-    (log/info (reduce + 0 (pmap copy ds)) "static files were copied")))
-
-(defn- clean
-  []
-  (fs/delete-dir (output-dir)))
+  [{:keys [root general]} key]
+  (io/file root (key general)))
 
 (defn build-fs
   [config]
-  (let [root (:root config)
-        cache-dir (io/file root (get-in config [:general :cache]))]
-    (fs2/make-fs root cache-dir)))
+  (let [root-dir    (io/as-file (:root config))
+        cache-dir   (as-file config :cache)
+        notes-dir   (as-file config :notes)
+        output-dir  (as-file config :output)
+        pages-dir   (as-file config :pages)]
+    (fs/make-blog-fs
+      (fs/make-dirs root-dir cache-dir notes-dir pages-dir output-dir))))
+
+(defn- render-standalone-page
+  [{:keys [src dst]}]
+  (let [{:keys [media-extension fmt-config global-vars]}  *context*
+        page-text                                         (slurp src)
+        {:keys [title], :as transformed}                  (md/transform page-text media-extension)]
+    (log/debug title "->" dst)
+    (util/write-file
+      dst
+      (fm/render fmt-config standalone-template (assoc transformed
+                                                  :vars global-vars)))))
+
+(defn- copy-static
+  [fs dirs]
+  (log/info
+    (reduce + 0 (map #(.copy-to-output fs %) dirs))
+    "static files were copied"))
 
 (defn build
-  [blog-config]
-  (let [config (merge-with into defaults/config blog-config)]
-    (binding [*config*  config
-              *fs*      (build-fs config)]
-      (do
-        (clean)
-        (render)
-        (copy-static)
-        (.save *fs*)))))
+  [{vars :vars, {:keys [base-url date-format notes-per-page tz pages copy], :as general} :general, :as blog-config}]
+  (let [config (defaults/with-defaults blog-config)]
+    (with-open [fs (build-fs config)]
+      (binding [*context*   {:base-url        base-url
+                             :global-vars     (make-global-vars vars)
+                             :fmt-config      (fm/make-config (as-file config :theme))
+                             :date-format     date-format
+                             :tz              tz
+                             :media-extension (renderers/media-extension)
+                             :note-cache      (atom {})}]
+        (doseq [note (notes/outdated-notes fs)]
+          (render-single-note note))
+        (doseq [page (notes/outdated-pages fs notes-per-page)]
+          (render-page page))
+        (render-rss (:rss general) fs)
+        (doseq [page (notes/outdated-standalone-pages fs)]
+          (render-standalone-page page))
+        (copy-static fs copy)))))

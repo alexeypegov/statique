@@ -1,5 +1,7 @@
 (ns statique.renderers
-  (:require [clojure.string :as s])
+  (:require [clojure.string :as string]
+            [statique.noembed :as noembed]
+            [statique.logging :as log])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -18,27 +20,24 @@
   "Checks whatever s is an URL, i.e. starts with URL prefix"
   [s]
   (or
-    (s/starts-with? s "http://")
-    (s/starts-with? s "https://")))
+    (string/starts-with? s "http://")
+    (string/starts-with? s "https://")))
 
 (defn- process-link-node
   "Checks whatever given node is an URL and replaces it with a MediaNode if needed"
   [node]
   (let [text (.getLiteral node)]
     (when (url? text)
-      (let [url (java.net.URL. text)
-            host (.getHost url)]
-        (cond
-          (some #(s/ends-with? host %) media-services)
+      (let [host (.getHost (java.net.URL. text))]
+        (if (some #(string/ends-with? host %) media-services)
+          (doto node
+            (.insertAfter (MediaNode. text))
+            (.unlink))
+          (let [link (Link. text nil)]
+            (.appendChild link (Text. text))
             (doto node
-              (.insertAfter (MediaNode. text))
-              (.unlink))
-          :else ; plain link
-            (let [link (Link. text nil)]
-              (.appendChild link (Text. text))
-              (doto node
-                (.insertAfter link)
-                (.unlink))))))))
+              (.insertAfter link)
+              (.unlink))))))))
 
 (defn- link-visitor
   []
@@ -60,15 +59,14 @@
   [base-url]
   (proxy [AbstractVisitor] []
     (visit [node]
-           (cond
-             (instance? Image node)
-              (.setDestination node (format "%s%s" base-url (.getDestination node)))
-             :else (proxy-super visitChildren node)))))
+           (if (instance? Image node)
+             (.setDestination node (format "%s%s" base-url (.getDestination node)))
+             (proxy-super visitChildren node)))))
 
 (defn- write-media-html
-  [node noembed writer]
+  [node writer]
   (let [url   (.getUrl node)
-        data  (.getCached noembed url)
+        data  (noembed/fetch url)
         html  (:html data)
         width (:width data)]
     (if (some? width)
@@ -85,18 +83,17 @@
         (.tag "/a")))))
 
 (defn- media-node-renderer
-  [noembed context]
+  [context]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
       (^void render [_ ^Node node]
-             (write-media-html node noembed writer)))))
+             (write-media-html node writer)))))
 
-(defn- html-node-renderer-factory
-  [noembed]
+(def html-node-renderer-factory
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
-                   (media-node-renderer noembed context))))
+                   (media-node-renderer context))))
 
 (defn- post-processor
   [base-url]
@@ -107,14 +104,16 @@
         (.accept node (image-visitor base-url)))
       node)))
 
+; todo get rid of base-url
 (defn media-extension
-  [noembed base-url]
-  (reify
-    Parser$ParserExtension
-    (^void extend
-      [_ ^Parser$Builder parserBuilder]
-      (.postProcessor parserBuilder (post-processor base-url)))
-    HtmlRenderer$HtmlRendererExtension
-    (^void extend
-      [_ ^HtmlRenderer$Builder rendererBuilder]
-      (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed)))))
+  ([] (media-extension nil))
+  ([base-url]
+    (reify
+      Parser$ParserExtension
+      (^void extend
+        [_ ^Parser$Builder parserBuilder]
+        (.postProcessor parserBuilder (post-processor base-url)))
+      HtmlRenderer$HtmlRendererExtension
+      (^void extend
+        [_ ^HtmlRenderer$Builder rendererBuilder]
+        (.nodeRendererFactory rendererBuilder html-node-renderer-factory)))))
