@@ -13,7 +13,7 @@
 
 (defprotocol BlogFileSystem
   (info [this file])
-  (copy [this src dst-dir])
+  (copy-to-output [this src])
   (relative [this file])
   (note-files [this])
   (page-files [this])
@@ -53,10 +53,11 @@
 (defn- copy-info-fn
   [root-dir cache src-dir dst-dir]
   (fn [file]
-    (assoc (file-info root-dir file cache)
-      :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file)))))
+    (let [info (file-info root-dir cache file)]
+      (assoc info
+        :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file))))))
 
-(def copy
+(def ^:private copy
   (fn [{:keys [src dst crc cached-crc], :as info}]
     (let [not-exists    (not (.exists dst))
           crc-mismatch  (not= crc cached-crc)]
@@ -78,10 +79,12 @@
         info-fn     (partial file-info root crc-cache)]
     (swap! closeables conj crc-cache)
     (reify BlogFileSystem
-      (copy [_ src-dir dst-dir]
-            (let [copier (make-copier root crc-cache src-dir dst-dir)]
-              (filter some?
-                  (map copier (list-files src-dir)))))
+      (copy-to-output [_ src]
+            (let [src-file  (io/file root src)
+                  copier    (make-copier root crc-cache src-file output)]
+              (count
+                (filter some?
+                        (map copier (list-files src-file))))))
       (info [_ file]
             (info-fn file))
       (cache [this name]

@@ -59,19 +59,6 @@
   (.format DateTimeFormatter/RFC_1123_DATE_TIME datetime))
 
 (defn write-file
-  "Writes given content to a filename placed in the given directory
-   (will create directories if needed)"
-  [dir {:keys [content filename]}]
-  {:pre [(string? content)
-         (string? filename)]}
-  (let [file (io/file dir filename)]
-    (do
-      (.mkdirs (.getParentFile file))
-      (with-open [w (io/writer file)]
-        (.write w content)
-        (.getPath file)))))
-
-(defn write-file-2
   [path content]
   (let [file (io/file path)]
     (.mkdirs (.getParentFile file))
