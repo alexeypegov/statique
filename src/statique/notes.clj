@@ -15,8 +15,7 @@
     (assoc note
       :src-outdated src-outdated
       :outdated     (or src-outdated dst-outdated)
-      :dst          dst
-      :slug         slug)))
+      :dst          dst)))
 
 (defn all-notes
   [fs]
@@ -63,3 +62,22 @@
     (filter
       :outdated
       (map page-info-fn (paged-seq fs page-size)))))
+
+(defn- standalone-info
+  [output-dir {:keys [src crc cached-crc slug], :as file}]
+  (let [filename        (str slug out-ext)
+        dst             (io/file output-dir filename)
+        dst-outdated    (not (.exists dst))
+        src-outdated    (not= crc cached-crc)]
+    (assoc file
+      :outdated (or src-outdated dst-outdated)
+      :dst      dst)))
+
+(defn- standalone-pages
+  [fs]
+  (let [standalone-info-fn  (partial standalone-info (.output-dir fs))]
+    (map standalone-info-fn (.page-files fs))))
+
+(defn outdated-standalone-pages
+  [fs]
+  (filter :outdated (standalone-pages fs)))

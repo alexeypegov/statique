@@ -16,12 +16,14 @@
   (copy [this src dst-dir])
   (relative [this file])
   (note-files [this])
+  (page-files [this])
   (output-dir [this])
+  (root-dir [this])
   (cache [this name])
   (close [this]))
 
 (defrecord FileInfo [relative slug crc cached-crc src])
-(defrecord Directories [root cache notes output])
+(defrecord Directories [root cache notes pages output])
 
 (defn- slug
   [file]
@@ -29,8 +31,8 @@
     (string/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
 (defn make-dirs
-  [root cache notes output]
-  (->Directories root cache notes output))
+  [root cache notes pages output]
+  (->Directories root cache notes pages output))
 
 (defn- list-files
   [file-or-dir]
@@ -69,7 +71,7 @@
     (copy-info-fn root-dir cache src-dir dst-dir)))
 
 (defn make-blog-fs
-  [^Directories {:keys [root cache output notes], :as dirs}]
+  [^Directories {:keys [root cache output notes pages], :as dirs}]
   (let [closeables  (atom '())
         crc-file    (io/file cache cache-name)
         crc-cache   (cache/file-cache crc-file)
@@ -90,8 +92,12 @@
                 (util/relative-path root file))
       (output-dir [_]
                   output)
+      (root-dir [_]
+                root)
       (note-files [this]
                   (map info-fn (reverse (util/sorted-files notes markdown-ext))))
+      (page-files [this]
+                  (map info-fn (util/sorted-files pages markdown-ext)))
       (close [_]
              (doseq [cache @closeables]
                (.close cache))))))
