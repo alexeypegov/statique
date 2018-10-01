@@ -1,6 +1,7 @@
 (ns statique.builder
   (:require
     [clojure.java.io :as io]
+    [clj-uuid :as uuid]
     [statique.util :as util]
     [statique.logging :as log]
     [statique.notes :as notes]
@@ -12,6 +13,7 @@
 
 (def ^:private output-ext           ".html")
 (def ^:private rss-ext              ".xml")
+(def ^:private freemarker-ext       ".ftl")
 (def ^:private note-template        "note")
 (def ^:private page-template        "index")
 (def ^:private standalone-template  "page")
@@ -31,12 +33,16 @@
           transformed (md/transform note-text media-extension)
           parsed-date (util/parse-local-date date-format tz (:date transformed))
           rfc-822     (util/rfc-822 parsed-date)
+          rfc-3339    (util/rfc-3339 parsed-date)
           note-link   (str "/" slug output-ext)
+          uuid        (uuid/v3 uuid/+namespace-url+ note-link)
           note        (assoc transformed
                         :slug         slug
                         :link         note-link
                         :parsed-date  parsed-date
-                        :rfc-822      rfc-822)]
+                        :rfc-822      rfc-822
+                        :rfc-3339     rfc-3339
+                        :uuid         uuid)]
       (swap! note-cache assoc relative note)
       note)))
 
@@ -48,8 +54,8 @@
     (util/write-file
       dst
       (fm/render fmt-config note-template (assoc {}
-                                                    :note transformed-item
-                                                    :vars global-vars)))))
+                                            :note transformed-item
+                                            :vars global-vars)))))
 
 (defn- render-page
   [{index :index, dst :dst, items :items, next? :next?}]
@@ -59,31 +65,38 @@
     (util/write-file
       dst
       (fm/render fmt-config page-template {:vars  global-vars
-                                                   :items transformed-items
-                                                   :ndx   index
-                                                   :next  (if next? (inc index) -1)
-                                                   :prev  (if (> index 1) (dec index) -1)}))))
+                                           :items transformed-items
+                                           :ndx   index
+                                           :next  (if next? (inc index) -1)
+                                           :prev  (if (> index 1) (dec index) -1)}))))
 
-(defn- transform-templates
-  [templates fs]
-  (let [output-dir (.output-dir fs)]
+(defn- transform-feed-templates
+  [names fs]
+  (let [output-dir  (.output-dir fs)
+        theme-dir   (.theme-dir fs)]
     (map (fn [name]
-           (let [dst (io/file output-dir (str name rss-ext))]
-             {:name     name
-              :dst      dst
-              :outdated (not (.exists dst))})) templates)))
+           (let [src                              (io/file theme-dir (str name freemarker-ext))
+                 dst                              (io/file output-dir (str name rss-ext))
+                 dst-outdated                     (not (.exists dst))
+                 {:keys [crc-mismatch], :as info} (.info fs src)]
+             (assoc info
+               :name     name
+               :dst      dst
+               :outdated (or crc-mismatch (not (.exists dst))))))
+         names)))
 
-(defn- render-rss
-  [{rss-count :count, templates :feeds} fs]
+(defn- render-feeds
+  [{rss-count :items, templates :names} fs]
   (when (not (empty? templates))
     (let [items         (take rss-count (notes/all-notes fs))
           has-outdated  (not (empty? (filter :src-outdated items)))
-          ts            (transform-templates templates fs)
+          ts            (transform-feed-templates templates fs)
           ts-outdated   (not (empty? (filter :outdated ts)))]
       (when (or has-outdated ts-outdated)
         (let [transformed (map #(prepare-note-item % *context*) items)
               {:keys [base-url fmt-config global-vars]} *context*]
           (doseq [{:keys [name dst]} ts]
+            (log/debug "feed" name "->" dst)
             (util/write-file
               dst
               (fm/render fmt-config name {:vars     global-vars
@@ -106,9 +119,10 @@
         cache-dir   (as-file config :cache)
         notes-dir   (as-file config :notes)
         output-dir  (as-file config :output)
-        pages-dir   (as-file config :pages)]
+        pages-dir   (as-file config :pages)
+        theme-dir   (as-file config :theme)]
     (fs/make-blog-fs
-      (fs/make-dirs root-dir cache-dir notes-dir pages-dir output-dir))))
+      (fs/make-dirs root-dir cache-dir notes-dir pages-dir theme-dir output-dir))))
 
 (defn- render-standalone-page
   [{:keys [src dst]}]
@@ -142,7 +156,7 @@
           (render-single-note note))
         (doseq [page (notes/outdated-pages fs notes-per-page)]
           (render-page page))
-        (render-rss (:rss general) fs)
+        (render-feeds (:feeds general) fs)
         (doseq [page (notes/outdated-standalone-pages fs)]
           (render-standalone-page page))
         (copy-static fs copy)))))

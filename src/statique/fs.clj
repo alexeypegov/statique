@@ -18,12 +18,13 @@
   (note-files [this])
   (page-files [this])
   (output-dir [this])
+  (theme-dir [this])
   (root-dir [this])
   (cache [this name])
   (close [this]))
 
-(defrecord FileInfo [relative slug crc cached-crc src])
-(defrecord Directories [root cache notes pages output])
+(defrecord FileInfo [relative slug crc-mismatch src])
+(defrecord Directories [root cache notes pages theme output])
 
 (defn- slug
   [file]
@@ -31,8 +32,8 @@
     (string/lower-case (subs name 0 (- (count name) (count markdown-ext))))))
 
 (defn make-dirs
-  [root cache notes pages output]
-  (->Directories root cache notes pages output))
+  [root cache notes pages theme output]
+  (->Directories root cache notes pages theme output))
 
 (defn- list-files
   [file-or-dir]
@@ -43,12 +44,13 @@
 
 (defn- file-info
   [root-dir cache file]
-  (let [relative    (util/relative-path root-dir file)
-        cached-crc  (.get cache relative 0)
-        crc         (crc/crc32 file)
-        slug        (slug file)]
+  (let [relative      (util/relative-path root-dir file)
+        cached-crc    (.get cache relative 0)
+        crc           (crc/crc32 file)
+        crc-mismatch  (not= crc cached-crc)
+        slug          (slug file)]
     (.put cache relative crc)
-    (->FileInfo relative slug crc cached-crc file)))
+    (->FileInfo relative slug crc-mismatch file)))
 
 (defn- copy-info-fn
   [root-dir cache src-dir dst-dir]
@@ -58,9 +60,8 @@
         :dst (io/file dst-dir (util/relative-path (.getParent src-dir) file))))))
 
 (def ^:private copy
-  (fn [{:keys [src dst crc cached-crc], :as info}]
-    (let [not-exists    (not (.exists dst))
-          crc-mismatch  (not= crc cached-crc)]
+  (fn [{:keys [src dst crc-mismatch], :as info}]
+    (let [not-exists (not (.exists dst))]
       (when (or not-exists crc-mismatch)
         (fs/copy+ src dst)
         info))))
@@ -72,7 +73,7 @@
     (copy-info-fn root-dir cache src-dir dst-dir)))
 
 (defn make-blog-fs
-  [^Directories {:keys [root cache output notes pages], :as dirs}]
+  [^Directories {:keys [root cache output notes pages theme], :as dirs}]
   (let [closeables  (atom '())
         crc-file    (io/file cache cache-name)
         crc-cache   (cache/file-cache crc-file)
@@ -97,6 +98,8 @@
                   output)
       (root-dir [_]
                 root)
+      (theme-dir [_]
+                 theme)
       (note-files [this]
                   (map info-fn (reverse (util/sorted-files notes markdown-ext))))
       (page-files [this]

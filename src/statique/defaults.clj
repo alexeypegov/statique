@@ -9,8 +9,8 @@
              :date-format     "yyyy-MM-dd"
              :tz              "Europe/Moscow"
              :base-url        "/"
-             :rss             {:count 10
-                               :feeds ["rss"]}
+             :feeds           {:items 10
+                               :names ["rss"]}
              :copy            nil
              :pages           nil
              :keep            nil}

@@ -58,6 +58,10 @@
   [datetime]
   (.format DateTimeFormatter/RFC_1123_DATE_TIME datetime))
 
+(defn rfc-3339
+  [datetime]
+  (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
+
 (defn write-file
   [path content]
   (let [file (io/file path)]

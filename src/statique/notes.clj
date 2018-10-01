@@ -7,14 +7,12 @@
 (def ^:private markdown-ext ".md")
 
 (defn- note-info
-  [output-dir {:keys [src slug crc cached-crc], :as note}]
+  [output-dir {:keys [src slug crc-mismatch], :as note}]
   (let [filename        (str slug out-ext)
         dst             (io/file output-dir filename)
-        dst-outdated    (not (.exists dst))
-        src-outdated    (not= crc cached-crc)]
+        dst-outdated    (not (.exists dst))]
     (assoc note
-      :src-outdated src-outdated
-      :outdated     (or src-outdated dst-outdated)
+      :outdated     (or crc-mismatch dst-outdated)
       :dst          dst)))
 
 (defn all-notes
@@ -29,12 +27,7 @@
 
 (defn- paged-seq
   [fs page-size]
-  (util/paged-seq
-    page-size
-    (map
-      (fn [{:keys [crc cached-crc], :as info}]
-        (assoc info :outdated (not= crc cached-crc)))
-      (.note-files fs))))
+  (util/paged-seq page-size (.note-files fs)))
 
 (defn- page-filename
   [ndx]
@@ -43,7 +36,7 @@
 
 (defn- page-info
   [page-cache output-dir {items :items, index :index, :as page}]
-  (let [has-outdated-notes  (some :outdated items)
+  (let [has-outdated-notes  (some :crc-mismatch items)
         dst                 (io/file output-dir (page-filename index))
         dst-outdated        (not (.exists dst))
         cached-items        (.get page-cache index)
@@ -64,13 +57,12 @@
       (map page-info-fn (paged-seq fs page-size)))))
 
 (defn- standalone-info
-  [output-dir {:keys [src crc cached-crc slug], :as file}]
+  [output-dir {:keys [src crc-mismatch slug], :as file}]
   (let [filename        (str slug out-ext)
         dst             (io/file output-dir filename)
-        dst-outdated    (not (.exists dst))
-        src-outdated    (not= crc cached-crc)]
+        dst-outdated    (not (.exists dst))]
     (assoc file
-      :outdated (or src-outdated dst-outdated)
+      :outdated (or crc-mismatch dst-outdated)
       :dst      dst)))
 
 (defn- standalone-pages
