@@ -101,7 +101,8 @@
               dst
               (fm/render fmt-config name {:vars     global-vars
                                           :items    transformed
-                                          :base-url base-url}))))))))
+                                          :base-url base-url
+                                          :name     name}))))))))
 
 (defn- make-global-vars
   [vars]
