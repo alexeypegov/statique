@@ -89,7 +89,7 @@
   [{rss-count :items, templates :names} fs]
   (when (not (empty? templates))
     (let [items         (take rss-count (notes/all-notes fs))
-          has-outdated  (not (empty? (filter :src-outdated items)))
+          has-outdated  (not (empty? (filter :outdated items)))
           ts            (transform-feed-templates templates fs)
           ts-outdated   (not (empty? (filter :outdated ts)))]
       (when (or has-outdated ts-outdated)
