@@ -20,7 +20,7 @@
   (output-dir [this])
   (theme-dir [this])
   (root-dir [this])
-  (cache [this name])
+  (get-cache [this name])
   (close [this]))
 
 (defrecord FileInfo [relative slug crc-mismatch src])
@@ -88,7 +88,7 @@
                         (map copier (list-files src-file))))))
       (info [_ file]
             (info-fn file))
-      (cache [this name]
+      (get-cache [this name]
              (let [cache (cache/file-cache (io/file cache (str name cache-ext)))]
                (swap! closeables conj cache)
                cache))

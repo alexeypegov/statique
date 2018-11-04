@@ -50,7 +50,7 @@
 (defn outdated-pages
   [fs page-size]
   (let [output-dir    (.output-dir fs)
-        page-cache    (.cache fs "pages")
+        page-cache    (.get-cache fs "pages")
         page-info-fn  (partial page-info page-cache output-dir)]
     (filter
       :outdated

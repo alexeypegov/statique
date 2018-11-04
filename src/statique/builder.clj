@@ -26,8 +26,8 @@
 (def ^:private ^:dynamic *context* nil)
 
 (defn- prepare-note-item
-  [{:keys [src slug relative], :as item} {:keys [media-extension date-format tz note-cache]}]
-  (if-let [cached-note (get @note-cache relative)]
+  [{:keys [src slug relative], :as item} {:keys [media-extension date-format tz note-cache]} use-cache]
+  (if-let [cached-note (when use-cache (.get note-cache relative))]
     cached-note
     (let [note-text   (slurp src)
           transformed (md/transform note-text media-extension)
@@ -39,17 +39,16 @@
           note        (assoc transformed
                         :slug         slug
                         :link         note-link
-                        :parsed-date  parsed-date
                         :rfc-822      rfc-822
                         :rfc-3339     rfc-3339
                         :uuid         uuid)]
-      (swap! note-cache assoc relative note)
+      (.put note-cache relative note)
       note)))
 
 (defn- render-single-note
   [{:keys [src dst slug relative], :as item}]
   (let [{:keys [fmt-config global-vars]}      *context*
-        {title :title, :as transformed-item}  (prepare-note-item item *context*)]
+        {title :title, :as transformed-item}  (prepare-note-item item *context* false)]
     (log/debug title "->" dst)
     (util/write-file
       dst
@@ -60,7 +59,7 @@
 (defn- render-page
   [{index :index, dst :dst, items :items, next? :next?}]
   (let [{:keys  [fmt-config global-vars media-extension note-cache]} *context*
-        transformed-items (map #(prepare-note-item % *context*) items)]
+        transformed-items (map #(prepare-note-item % *context* true) items)]
     (log/debug "page" index "->" dst)
     (util/write-file
       dst
@@ -93,7 +92,7 @@
           ts            (transform-feed-templates templates fs)
           ts-outdated   (not (empty? (filter :outdated ts)))]
       (when (or has-outdated ts-outdated)
-        (let [transformed (map #(prepare-note-item % *context*) items)
+        (let [transformed (map #(prepare-note-item % *context* true) items)
               {:keys [base-url fmt-config global-vars]} *context*]
           (doseq [{:keys [name dst]} ts]
             (log/debug "feed" name "->" dst)
@@ -152,7 +151,7 @@
                              :date-format     date-format
                              :tz              tz
                              :media-extension (renderers/media-extension)
-                             :note-cache      (atom {})}]
+                             :note-cache      (.get-cache fs "notes")}]
         (doseq [note (notes/outdated-notes fs)]
           (render-single-note note))
         (doseq [page (notes/outdated-pages fs notes-per-page)]
