@@ -151,7 +151,7 @@
                              :date-format     date-format
                              :tz              tz
                              :media-extension (renderers/media-extension)
-                             :note-cache      (.get-cache fs "notes")}]
+                             :note-cache      (.get-instant-cache fs "notes")}]
         (doseq [note (notes/outdated-notes fs)]
           (render-single-note note))
         (doseq [page (notes/outdated-pages fs notes-per-page)]

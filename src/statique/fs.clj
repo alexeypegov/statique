@@ -21,6 +21,7 @@
   (theme-dir [this])
   (root-dir [this])
   (get-cache [this name])
+  (get-instant-cache [this name])
   (close [this]))
 
 (defrecord FileInfo [relative slug crc-mismatch src])
@@ -90,6 +91,10 @@
             (info-fn file))
       (get-cache [this name]
              (let [cache (cache/file-cache (io/file cache (str name cache-ext)))]
+               (swap! closeables conj cache)
+               cache))
+      (get-instant-cache [this name]
+             (let [cache (cache/file-cache (io/file cache (str name cache-ext)) :instant true)]
                (swap! closeables conj cache)
                cache))
       (relative [_ file]

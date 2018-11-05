@@ -13,25 +13,22 @@
   (close [this]))
 
 (defn file-cache
-  ([file] (file-cache file nil))
-  ([file producer]
+  ([file & {:keys [instant] :or {instant false}}]
     (let [c-file  (io/as-file file)
-          r-data  (util/read-edn file)
-          w-data  (atom {})]
+          edn     (util/read-edn file)
+          r-data  edn
+          w-data  (atom (if instant edn {}))]
       (log/debug (count r-data) "entries were read from" file)
       (reify
         Cache
         (get [this k]
              (.get this k nil))
         (get [this k d]
-                (if producer
-                  (let [cache-value (map-get r-data k :not-found)
-                        result      (if (= cache-value :not-found) (producer k) cache-value)]
-                    (.put this k result)
-                    result)
-                  (map-get r-data k)))
+             (if instant
+               (map-get @w-data k)
+               (map-get r-data k)))
         (put [_ k v]
-                 (swap! w-data assoc k v))
+             (swap! w-data assoc k v))
         FileCache
         (close [_]
               (.mkdirs (.getParentFile c-file))
