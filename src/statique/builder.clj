@@ -26,22 +26,24 @@
 (def ^:private ^:dynamic *context* nil)
 
 (defn- prepare-note-item
-  [{:keys [src slug relative], :as item} {:keys [media-extension date-format tz note-cache]} use-cache]
+  [{:keys [src slug relative], :as item} {:keys [extension extension-abs date-format tz note-cache]} use-cache]
   (if-let [cached-note (when use-cache (.get note-cache relative))]
     cached-note
-    (let [note-text   (slurp src)
-          transformed (md/transform note-text media-extension)
-          parsed-date (util/parse-local-date date-format tz (:date transformed))
-          rfc-822     (util/rfc-822 parsed-date)
-          rfc-3339    (util/rfc-3339 parsed-date)
-          note-link   (str "/" slug output-ext)
-          uuid        (uuid/v3 uuid/+namespace-url+ note-link)
-          note        (assoc transformed
-                        :slug         slug
-                        :link         note-link
-                        :rfc-822      rfc-822
-                        :rfc-3339     rfc-3339
-                        :uuid         uuid)]
+    (let [note-text       (slurp src)
+          transformed     (md/transform note-text extension)
+          transformed-abs (md/transform note-text extension-abs)
+          parsed-date     (util/parse-local-date date-format tz (:date transformed))
+          rfc-822         (util/rfc-822 parsed-date)
+          rfc-3339        (util/rfc-3339 parsed-date)
+          note-link       (str "/" slug output-ext)
+          uuid            (uuid/v3 uuid/+namespace-url+ note-link)
+          note            (assoc transformed
+                            :body-abs     (:body transformed-abs)
+                            :slug         slug
+                            :link         note-link
+                            :rfc-822      rfc-822
+                            :rfc-3339     rfc-3339
+                            :uuid         uuid)]
       (.put note-cache relative note)
       note)))
 
@@ -58,7 +60,7 @@
 
 (defn- render-page
   [{index :index, dst :dst, items :items, next? :next?}]
-  (let [{:keys  [fmt-config global-vars media-extension note-cache]} *context*
+  (let [{:keys  [fmt-config global-vars extension note-cache]} *context*
         transformed-items (map #(prepare-note-item % *context* true) items)]
     (log/debug "page" index "->" dst)
     (util/write-file
@@ -126,14 +128,16 @@
 
 (defn- render-standalone-page
   [{:keys [src dst]}]
-  (let [{:keys [media-extension fmt-config global-vars]}  *context*
-        page-text                                         (slurp src)
-        {:keys [title], :as transformed}                  (md/transform page-text media-extension)]
+  (let [{:keys [extension fmt-config global-vars]}  *context*
+        page-text                                   (slurp src)
+        {:keys [title], :as transformed}            (md/transform page-text extension)]
     (log/debug title "->" dst)
     (util/write-file
       dst
-      (fm/render fmt-config standalone-template (assoc transformed
-                                                  :vars global-vars)))))
+      (fm/render
+        fmt-config
+        standalone-template
+        (assoc transformed :vars global-vars)))))
 
 (defn- copy-static
   [fs dirs]
@@ -150,7 +154,8 @@
                              :fmt-config      (fm/make-config (as-file config :theme))
                              :date-format     date-format
                              :tz              tz
-                             :media-extension (renderers/media-extension)
+                             :extension       (renderers/media-extension)
+                             :extension-abs   (renderers/media-extension base-url)
                              :note-cache      (.get-instant-cache fs "notes")}]
         (doseq [note (notes/outdated-notes fs)]
           (render-single-note note))
