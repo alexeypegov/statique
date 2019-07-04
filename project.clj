@@ -3,7 +3,7 @@
   :url "http://github.com/alexeypegov/statique"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.9.0"]
+  :dependencies [[org.clojure/clojure "1.10.1"]
                  [slingshot "0.12.2"]
                  [io.forward/yaml "1.0.6"]
                  [com.atlassian.commonmark/commonmark "0.11.0"]
