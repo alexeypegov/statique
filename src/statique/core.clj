@@ -76,7 +76,7 @@
 (defn -main
   [& args]
   (println (format "Statique %s" version))
-  (let [{:keys [options arguments errors summary]}  (cli/parse-opts args cli-options)]
+  (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)]
     (cond
       (:help options) (u/exit 0 (usage summary))
       errors          (u/exit 1 errors))

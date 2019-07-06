@@ -26,7 +26,7 @@
 (def ^:private ^:dynamic *context* nil)
 
 (defn- prepare-note-item
-  [{:keys [src slug relative], :as item} {:keys [extension extension-abs date-format tz note-cache]} use-cache]
+  [{:keys [src slug relative]} {:keys [extension extension-abs date-format tz note-cache]} use-cache]
   (if-let [cached-note (when use-cache (.get note-cache relative))]
     cached-note
     (let [note-text       (slurp src)
@@ -48,7 +48,7 @@
       note)))
 
 (defn- render-single-note
-  [{:keys [src dst slug relative], :as item}]
+  [{:keys [dst], :as item}]
   (let [{:keys [fmt-config global-vars]}      *context*
         {title :title, :as transformed-item}  (prepare-note-item item *context* false)]
     (log/debug title "->" dst)
@@ -60,7 +60,7 @@
 
 (defn- render-page
   [{index :index, dst :dst, items :items, next? :next?}]
-  (let [{:keys  [fmt-config global-vars extension note-cache]} *context*
+  (let [{:keys  [fmt-config global-vars]} *context*
         transformed-items (map #(prepare-note-item % *context* true) items)]
     (log/debug "page" index "->" dst)
     (util/write-file
@@ -78,7 +78,6 @@
     (map (fn [name]
            (let [src                              (io/file theme-dir (str name freemarker-ext))
                  dst                              (io/file output-dir (str name rss-ext))
-                 dst-outdated                     (not (.exists dst))
                  {:keys [crc-mismatch], :as info} (.info fs src)]
              (assoc info
                :name     name

@@ -3,9 +3,11 @@
             [clojure.string :as str]
             [java-time :as time]
             [statique.logging :as log])
-  (:import [java.nio.file Path Paths]
-           [java.util Properties]
-           [java.time.format DateTimeFormatter]))
+  (:import [java.util Properties]
+           [java.time.format DateTimeFormatter]
+           [java.io File FilenameFilter]
+           [java.nio.file Files]
+           [java.time LocalDate]))
 
 (defn working-dir
   []
@@ -19,15 +21,15 @@
 (defn exit
   "Exits returing a given status and (optionally) prints some message"
   [status & s]
-  (when (string? s)
+  (when (seq? s)
     (apply log/info s))
   (System/exit status))
 
 (defn postfix-filter
   "Creates a postfix filename filter for File::listFiles"
   [^String postfix]
-  (reify java.io.FilenameFilter
-    (accept [this dir name]
+  (reify FilenameFilter
+    (accept [_ _ name]
             (str/ends-with? name postfix))))
 
 (defn file-comparator
@@ -39,9 +41,9 @@
 
 (defn sorted-files
   "Returns sorted sequence of files within the given directory optionally filtered by a postfix"
-  ([dir] (sorted-files dir nil))
+  ([^File dir] (sorted-files dir nil))
   ([dir postfix]
-    {:pre [(instance? java.io.File dir) (.isDirectory dir)]}
+    {:pre [(instance? File dir) (.isDirectory dir)]}
     (sort
       file-comparator
       (if postfix
@@ -51,7 +53,7 @@
 (defn parse-local-date
   "Parses local date/time using given formatter"
   [format tz date]
-  (let [local-date (time/local-date format date)]
+  (let [^LocalDate local-date (time/local-date format date)]
     (.atStartOfDay local-date (time/zone-id tz))))
 
 (defn rfc-822
@@ -63,7 +65,7 @@
   (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
 
 (defn write-file
-  [path content]
+  [path ^String content]
   (let [file (io/file path)]
     (.mkdirs (.getParentFile file))
     (with-open [w (io/writer file)]
