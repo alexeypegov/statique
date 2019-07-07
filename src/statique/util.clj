@@ -6,7 +6,6 @@
   (:import [java.util Properties]
            [java.time.format DateTimeFormatter]
            [java.io File FilenameFilter]
-           [java.nio.file Files]
            [java.time LocalDate]))
 
 (defn working-dir
@@ -32,23 +31,17 @@
     (accept [_ _ name]
             (str/ends-with? name postfix))))
 
-(defn file-comparator
-  "Filename based file comparator"
-  [file1 file2]
-  (compare
-    (.getName file1)
-    (.getName file2)))
+(defn list-files
+  [dir & {:keys [name-filter comparator]}]
+  {:pre [(instance? File dir) (.isDirectory dir)]}
+  (let [files (.listFiles dir name-filter)]
+    (if (nil? comparator)
+      files
+      (sort comparator files))))
 
 (defn sorted-files
-  "Returns sorted sequence of files within the given directory optionally filtered by a postfix"
-  ([^File dir] (sorted-files dir nil))
-  ([dir postfix]
-    {:pre [(instance? File dir) (.isDirectory dir)]}
-    (sort
-      file-comparator
-      (if postfix
-        (.listFiles dir (postfix-filter postfix))
-        (.listFiles dir)))))
+  [dir & {:keys [name-filter]}]
+  (list-files dir :comparator #(compare (.getName %1) (.getName %2)) :name-filter name-filter))
 
 (defn parse-local-date
   "Parses local date/time using given formatter"

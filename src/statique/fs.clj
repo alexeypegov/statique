@@ -106,9 +106,9 @@
       (theme-dir [_]
                  theme)
       (note-files [this]
-                  (map info-fn (reverse (util/sorted-files notes markdown-ext))))
+                  (map info-fn (reverse (util/sorted-files notes :name-filter (util/postfix-filter markdown-ext)))))
       (page-files [this]
-                  (map info-fn (util/sorted-files pages markdown-ext)))
+                  (map info-fn (util/sorted-files pages :name-filter (util/postfix-filter markdown-ext))))
       (close [_]
              (doseq [cache @closeables]
                (.close cache))))))

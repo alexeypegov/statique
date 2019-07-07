@@ -18,8 +18,7 @@
 (def ^:private page-template        "index")
 (def ^:private standalone-template  "page")
 
-(def ^:private statique-version (util/get-version 'statique))
-(def ^:private statique-string  (format "Statique %s" statique-version))
+(def ^:private statique-string  (format "Statique %s" (util/get-version 'statique)))
 (def ^:private statique-link    (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>",
                                         statique-string))
 
