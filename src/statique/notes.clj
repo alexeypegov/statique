@@ -29,7 +29,7 @@
   [fs page-size]
   (util/paged-seq page-size (.note-files fs)))
 
-(defn- page-filename
+(defn page-filename
   [ndx]
   (-> (if (= 1 ndx) "index" (str "page-" ndx))
       (str out-ext)))

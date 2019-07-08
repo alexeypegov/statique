@@ -60,11 +60,11 @@
   (let [{:keys  [fmt-config global-vars]} *context*
         transformed-items (map #(prepare-note-item % *context* true) items)]
     (log/debug "page" index "->" dst)
-    (->> {:vars  global-vars
-          :items transformed-items
-          :ndx   index
-          :next  (if next? (inc index) -1)
-          :prev  (if (> index 1) (dec index) -1)}
+    (->> {:vars       global-vars
+          :items      transformed-items
+          :ndx        index
+          :next-page  (when next? (notes/page-filename (inc index)))
+          :prev-page  (when (> index 1) (notes/page-filename (dec index)))}
          (fm/render fmt-config page-template)
          (util/write-file dst))))
 
