@@ -7,7 +7,7 @@
 (def ^:private markdown-ext ".md")
 
 (defn- note-info
-  [output-dir {:keys [src slug crc-mismatch], :as note}]
+  [output-dir {:keys [src slug crc-mismatch] :as note}]
   (let [filename        (str slug out-ext)
         dst             (io/file output-dir filename)
         dst-outdated    (not (.exists dst))]
@@ -31,11 +31,11 @@
 
 (defn- page-filename
   [ndx]
-  (let [prefix (if (= 1 ndx) "index" (str "page-" ndx))]
-    (str prefix out-ext)))
+  (-> (if (= 1 ndx) "index" (str "page-" ndx))
+      (str out-ext)))
 
 (defn- page-info
-  [page-cache output-dir {items :items, index :index, :as page}]
+  [page-cache output-dir {items :items index :index :as page}]
   (let [has-outdated-notes  (some :crc-mismatch items)
         dst                 (io/file output-dir (page-filename index))
         dst-outdated        (not (.exists dst))
@@ -67,8 +67,8 @@
 
 (defn- standalone-pages
   [fs]
-  (let [standalone-info-fn  (partial standalone-info (.output-dir fs))]
-    (map standalone-info-fn (.page-files fs))))
+  (-> (partial standalone-info (.output-dir fs))
+      (map (.page-files fs))))
 
 (defn outdated-standalone-pages
   [fs]

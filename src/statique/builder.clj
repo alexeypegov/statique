@@ -47,28 +47,26 @@
       note)))
 
 (defn- render-single-note
-  [{:keys [dst], :as item}]
-  (let [{:keys [fmt-config global-vars]}      *context*
-        {title :title, :as transformed-item}  (prepare-note-item item *context* false)]
+  [{:keys [dst] :as item}]
+  (let [{:keys [fmt-config global-vars]}    *context*
+        {title :title :as transformed-item} (prepare-note-item item *context* false)]
     (log/debug title "->" dst)
-    (util/write-file
-      dst
-      (fm/render fmt-config note-template (assoc {}
-                                            :note transformed-item
-                                            :vars global-vars)))))
+    (->> (assoc {} :note transformed-item :vars global-vars)
+         (fm/render fmt-config note-template)
+         (util/write-file dst))))
 
 (defn- render-page
-  [{index :index, dst :dst, items :items, next? :next?}]
+  [{index :index dst :dst items :items next? :next?}]
   (let [{:keys  [fmt-config global-vars]} *context*
         transformed-items (map #(prepare-note-item % *context* true) items)]
     (log/debug "page" index "->" dst)
-    (util/write-file
-      dst
-      (fm/render fmt-config page-template {:vars  global-vars
-                                           :items transformed-items
-                                           :ndx   index
-                                           :next  (if next? (inc index) -1)
-                                           :prev  (if (> index 1) (dec index) -1)}))))
+    (->> {:vars  global-vars
+          :items transformed-items
+          :ndx   index
+          :next  (if next? (inc index) -1)
+          :prev  (if (> index 1) (dec index) -1)}
+         (fm/render fmt-config page-template)
+         (util/write-file dst))))
 
 (defn- transform-feed-templates
   [names fs]
@@ -77,7 +75,7 @@
     (map (fn [name]
            (let [src                              (io/file theme-dir (str name freemarker-ext))
                  dst                              (io/file output-dir (str name rss-ext))
-                 {:keys [crc-mismatch], :as info} (.info fs src)]
+                 {:keys [crc-mismatch] :as info} (.info fs src)]
              (assoc info
                :name     name
                :dst      dst
@@ -85,23 +83,23 @@
          names)))
 
 (defn- render-feeds
-  [{rss-count :items, templates :names} fs]
-  (when (not (empty? templates))
+  [{rss-count :items templates :names} fs]
+  (when (seq templates)
     (let [items         (take rss-count (notes/all-notes fs))
-          has-outdated  (not (empty? (filter :outdated items)))
+          has-outdated  (seq (filter :outdated items))
           ts            (transform-feed-templates templates fs)
-          ts-outdated   (not (empty? (filter :outdated ts)))]
+          ts-outdated   (seq (filter :outdated ts))]
       (when (or has-outdated ts-outdated)
         (let [transformed (map #(prepare-note-item % *context* true) items)
               {:keys [base-url fmt-config global-vars]} *context*]
           (doseq [{:keys [name dst]} ts]
             (log/debug "feed" name "->" dst)
-            (util/write-file
-              dst
-              (fm/render fmt-config name {:vars     global-vars
-                                          :items    transformed
-                                          :base-url base-url
-                                          :name     name}))))))))
+            (->> {:vars     global-vars
+                  :items    transformed
+                  :base-url base-url
+                  :name     name}
+                 (fm/render fmt-config name)
+                 (util/write-file dst))))))))
 
 (defn- make-global-vars
   [vars]
@@ -128,14 +126,11 @@
   [{:keys [src dst]}]
   (let [{:keys [extension fmt-config global-vars]}  *context*
         page-text                                   (slurp src)
-        {:keys [title], :as transformed}            (md/transform page-text extension)]
+        {:keys [title] :as transformed}            (md/transform page-text extension)]
     (log/debug title "->" dst)
-    (util/write-file
-      dst
-      (fm/render
-        fmt-config
-        standalone-template
-        (assoc transformed :vars global-vars)))))
+    (->> (assoc transformed :vars global-vars)
+         (fm/render fmt-config standalone-template)
+         (util/write-file dst))))
 
 (defn- copy-static
   [fs dirs]

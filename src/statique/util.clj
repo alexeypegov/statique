@@ -20,7 +20,7 @@
 (defn exit
   "Exits returing a given status and (optionally) prints some message"
   [status & s]
-  (when (seq? s)
+  (when (seq s)
     (apply log/info s))
   (System/exit status))
 
@@ -46,7 +46,7 @@
 (defn parse-local-date
   "Parses local date/time using given formatter"
   [format tz date]
-  (let [^LocalDate local-date (time/local-date format date)]
+  (let [local-date (time/local-date format date)]
     (.atStartOfDay local-date (time/zone-id tz))))
 
 (defn rfc-822

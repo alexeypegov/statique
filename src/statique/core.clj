@@ -16,9 +16,9 @@
 
 (def cli-options
   [["-d" "--blog-dir DIR" "Blog dir"
-   :default (io/file (u/working-dir))
+   :default      (io/file (u/working-dir))
    :default-desc (u/working-dir)
-   :parse-fn #(fs/normalized %)]
+   :parse-fn     fs/normalized]
    [nil "--debug" "Debug output"]
    [nil "--help" "Print this help"]])
 
@@ -45,8 +45,8 @@
 
 (defn- parse-config
   [base]
-  (let [config-file (io/file base config-name)]
-    (yaml/from-file config-file convert-to-symbols)))
+  (-> (io/file base config-name)
+      (yaml/from-file convert-to-symbols)))
 
 (defn- build
   [root-dir]
@@ -54,12 +54,14 @@
 
 (defn- configure-debug-logging
   [options]
-  (when (or (:debug options) (Boolean/parseBoolean (System/getProperty "debug")))
+  (when (or
+          (:debug options)
+          (Boolean/parseBoolean (System/getProperty "debug")))
     (log/set-level :debug)))
 
 (defn- validate-root
   [root]
-  (if (not (blog-dir? root))
+  (if-not (blog-dir? root)
     (u/exit 1 (format "Can not find '%s' at '%s'" config-name (.getPath root)))
     (log/info (format "Root '%s'" (.getPath root)))))
 
@@ -75,7 +77,7 @@
 
 (defn -main
   [& args]
-  (println (format "Statique %s" version))
+  (printf "Statique %s" version)
   (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)]
     (cond
       (:help options) (u/exit 0 (usage summary))

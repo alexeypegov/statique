@@ -14,9 +14,9 @@
   (close [this]))
 
 (defn file-cache
-  ([file & {:keys [instant] :or {instant false}}]
-   (let [^File c-file (io/as-file file)
-         edn (util/read-edn file)
+  ([file & {:keys [instant]}]
+   (let [c-file (io/as-file file)
+         edn    (util/read-edn file)
          r-data edn
          w-data (atom (if instant edn {}))]
      (log/debug (count r-data) "entries were read from" file)

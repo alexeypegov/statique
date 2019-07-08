@@ -82,31 +82,29 @@
     (swap! closeables conj crc-cache)
     (reify BlogFileSystem
       (copy-to-output [_ src]
-            (let [src-file  (io/file root src)
-                  copier    (make-copier root crc-cache src-file output)]
-              (count
-                (filter some?
-                        (map copier (list-files src-file))))))
-      (info [_ file]
-            (info-fn file))
+                      (let [src-file  (io/file root src)
+                            copier    (make-copier root crc-cache src-file output)]
+                        (->> (list-files src-file)
+                             (map copier)
+                             (filter some?)
+                             count)))
+      (info [_ file] (info-fn file))
       (get-cache [this name]
-             (let [cache (cache/file-cache (io/file cache (str name cache-ext)))]
-               (swap! closeables conj cache)
-               cache))
+                 (let [cache (cache/file-cache (io/file cache (str name cache-ext)))]
+                   (swap! closeables conj cache)
+                   cache))
       (get-instant-cache [this name]
-             (let [cache (cache/file-cache (io/file cache (str name cache-ext)) :instant true)]
-               (swap! closeables conj cache)
-               cache))
-      (relative [_ file]
-                (util/relative-path root file))
-      (output-dir [_]
-                  output)
-      (root-dir [_]
-                root)
-      (theme-dir [_]
-                 theme)
+                         (let [cache (cache/file-cache (io/file cache (str name cache-ext)) :instant true)]
+                           (swap! closeables conj cache)
+                           cache))
+      (relative [_ file] (util/relative-path root file))
+      (output-dir [_] output)
+      (root-dir [_] root)
+      (theme-dir [_] theme)
       (note-files [this]
-                  (map info-fn (reverse (util/sorted-files notes :name-filter (util/postfix-filter markdown-ext)))))
+                  (->> (util/sorted-files notes :name-filter (util/postfix-filter markdown-ext))
+                       reverse
+                       (map info-fn)))
       (page-files [this]
                   (map info-fn (util/sorted-files pages :name-filter (util/postfix-filter markdown-ext))))
       (close [_]
