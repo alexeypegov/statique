@@ -73,8 +73,8 @@
   (let [output-dir  (.output-dir fs)
         theme-dir   (.theme-dir fs)]
     (map (fn [name]
-           (let [src                              (io/file theme-dir (str name freemarker-ext))
-                 dst                              (io/file output-dir (str name rss-ext))
+           (let [src                             (io/file theme-dir (str name freemarker-ext))
+                 dst                             (io/file output-dir (str name rss-ext))
                  {:keys [crc-mismatch] :as info} (.info fs src)]
              (assoc info
                :name     name
@@ -150,11 +150,8 @@
                              :extension       (renderers/media-extension)
                              :extension-abs   (renderers/media-extension base-url)
                              :note-cache      (.get-instant-cache fs "notes")}]
-        (doseq [note (notes/outdated-notes fs)]
-          (render-single-note note))
-        (doseq [page (notes/outdated-pages fs notes-per-page)]
-          (render-page page))
+        (dorun (pmap render-single-note (notes/outdated-notes fs)))
+        (dorun (pmap render-page (notes/outdated-pages fs notes-per-page)))
         (render-feeds (:feeds general) fs)
-        (doseq [page (notes/outdated-standalone-pages fs)]
-          (render-standalone-page page))
+        (dorun (pmap render-standalone-page (notes/outdated-standalone-pages fs)))
         (copy-static fs copy)))))
