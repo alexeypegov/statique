@@ -1,7 +1,7 @@
 (ns statique.freemarker
   (:require [clojure.java.io :as io])
   (:use [clojure.walk :only [postwalk]])
-  (:import [freemarker.template Configuration DefaultObjectWrapper]
+  (:import [freemarker.template Configuration DefaultObjectWrapper TemplateExceptionHandler TemplateException]
            [java.io File StringWriter]))
 
 (def ^:private def-ext      ".ftl")
@@ -14,20 +14,34 @@
     (doto (Configuration.)
                 (.setObjectWrapper (DefaultObjectWrapper.))
                 (.setDirectoryForTemplateLoading template-dir)
-                (.setDefaultEncoding encoding))))
+                (.setDefaultEncoding encoding)
+                (.setTemplateExceptionHandler TemplateExceptionHandler/RETHROW_HANDLER)
+                (.setLogTemplateExceptions false)
+                (.setWrapUncheckedExceptions true))))
 
 (defn m->model
   [m]
-  (let [stringify (fn [[k v]] (if (keyword? k) [(.replace (name k) "-" "_") v] [k v]))]
-    (postwalk #(cond (map? %) (into {} (map stringify %))
-                     :else %)
+  (let [stringify (fn [[k v]]
+                    (if (keyword? k)
+                      [(.replace (name k) "-" "_") v]
+                      [k v]))]
+    (postwalk #(if (map? %)
+                 (into {} (map stringify %))
+                 %)
               m)))
 
 (defn render
   [^Configuration cfg template-name params]
-  (let [writer    (StringWriter.)
-        name      (str template-name def-ext)
+  (let [name      (str template-name def-ext)
         template  (.getTemplate cfg name)
-        model     (m->model params)]
-    (.process template model writer)
-    (.toString writer)))
+        model     (m->model params)
+        writer    (StringWriter.)]
+    (try
+      (assoc {}
+        :result
+        (do
+          (.process template model writer)
+          (.toString writer)))
+      (catch TemplateException ex
+        (assoc {}
+          :error (.getMessage ex))))))

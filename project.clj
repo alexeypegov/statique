@@ -23,10 +23,12 @@
             [lein-eftest "0.4.3"]
             [lein-bin "0.3.4"]]
   :profiles {:dev {:dependencies [[clj-stacktrace "0.2.8"]]
-                   :jvm-opts ["-Ddebug=true"]}}
+                   :jvm-opts ["-Ddebug=true"]}
+             :prod {}}
   :repl-options {:init-ns statique.core
                  :caught clj-stacktrace.repl/pst+}
   :main statique.core
+  ; lein with-profile prod bin
   :bin {:name           "statique"
         :bin-path       "~/bin"
         :bootclasspath  true}

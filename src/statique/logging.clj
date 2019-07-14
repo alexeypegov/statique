@@ -10,7 +10,7 @@
 
 (defn- leveled
   [l & s]
-  (when (>= *level* (get levels l))
+  (when (>= (get levels l) *level*)
     (apply log s)))
 
 (defn info [& s] (apply leveled :info s))

@@ -46,13 +46,22 @@
       (.put note-cache relative note)
       note)))
 
+(defn- handle-render-error
+  [src {:keys [result error]}]
+  (if result
+    result
+    (do
+     (log/error "Error rendering" (.getPath src))
+     error)))
+
 (defn- render-single-note
-  [{:keys [dst] :as item}]
+  [{:keys [dst src] :as item}]
   (let [{:keys [fmt-config global-vars]}    *context*
         {title :title :as transformed-item} (prepare-note-item item *context* false)]
     (log/debug title "->" dst)
     (->> (assoc {} :note transformed-item :vars global-vars)
          (fm/render fmt-config note-template)
+         (handle-render-error src)
          (util/write-file dst))))
 
 (defn- render-page
@@ -66,6 +75,7 @@
           :next-page  (when next? (notes/page-filename (inc index)))
           :prev-page  (when (> index 1) (notes/page-filename (dec index)))}
          (fm/render fmt-config page-template)
+         (handle-render-error dst)
          (util/write-file dst))))
 
 (defn- transform-feed-templates
@@ -93,12 +103,14 @@
         (let [transformed (map #(prepare-note-item % *context* true) items)
               {:keys [base-url fmt-config global-vars]} *context*]
           (doseq [{:keys [name dst]} ts]
+            (log/info "Render" name "feed")
             (log/debug "feed" name "->" dst)
             (->> {:vars     global-vars
                   :items    transformed
                   :base-url base-url
                   :name     name}
                  (fm/render fmt-config name)
+                 (handle-render-error dst)
                  (util/write-file dst))))))))
 
 (defn- make-global-vars
@@ -130,6 +142,7 @@
     (log/debug title "->" dst)
     (->> (assoc transformed :vars global-vars)
          (fm/render fmt-config standalone-template)
+         (handle-render-error dst)
          (util/write-file dst))))
 
 (defn- copy-static
@@ -150,8 +163,19 @@
                              :extension       (renderers/media-extension)
                              :extension-abs   (renderers/media-extension base-url)
                              :note-cache      (.get-instant-cache fs "notes")}]
-        (dorun (pmap render-single-note (notes/outdated-notes fs)))
-        (dorun (pmap render-page (notes/outdated-pages fs notes-per-page)))
+        (log/info "Rendering notes...")
+        (log/info
+          (count (map render-single-note (notes/outdated-notes fs)))
+          "note(s) were rendered")
+        (log/info "Rendering pages...")
+        (log/info
+          (count (map render-page (notes/outdated-pages fs notes-per-page)))
+          "page(s) were rendered")
+        (log/info "Render feeds...")
         (render-feeds (:feeds general) fs)
-        (dorun (pmap render-standalone-page (notes/outdated-standalone-pages fs)))
+        (log/info "Render standalone pages...")
+        (log/info
+          (count (map render-standalone-page (notes/outdated-standalone-pages fs)))
+          "standalone page(s) were rendered")
+        (log/info "Copy static files...")
         (copy-static fs copy)))))

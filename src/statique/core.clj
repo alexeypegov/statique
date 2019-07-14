@@ -63,7 +63,7 @@
   [root]
   (if-not (blog-dir? root)
     (u/exit 1 (format "Can not find '%s' at '%s'" config-name (.getPath root)))
-    (log/info (format "Root '%s'" (.getPath root)))))
+    (log/debug (format "Root '%s'" (.getPath root)))))
 
 (defn- execute-command
   [args options]
@@ -73,11 +73,11 @@
       :build (do
         (validate-root root)
         (build root))
-      (log/info (format "Unknown command '%s'" (first args))))))
+      (log/error (format "Unknown command '%s'" (first args))))))
 
 (defn -main
   [& args]
-  (printf "Statique %s" version)
+  (log/info "Statique" version)
   (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)]
     (cond
       (:help options) (u/exit 0 (usage summary))
