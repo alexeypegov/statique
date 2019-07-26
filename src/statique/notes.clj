@@ -30,9 +30,9 @@
   (util/paged-seq page-size (.note-files fs)))
 
 (defn page-filename
-  [ndx]
+  [ndx & {:keys [ext] :or {ext out-ext}}]
   (-> (if (= 1 ndx) "index" (str "page-" ndx))
-      (str out-ext)))
+      (str ext)))
 
 (defn- page-info
   [page-cache output-dir {items :items index :index :as page}]

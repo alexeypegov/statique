@@ -72,8 +72,8 @@
     (->> {:vars       global-vars
           :items      transformed-items
           :ndx        index
-          :next-page  (when next? (notes/page-filename (inc index)))
-          :prev-page  (when (> index 1) (notes/page-filename (dec index)))}
+          :next-page  (when next? (notes/page-filename (inc index) :ext ""))
+          :prev-page  (when (> index 1) (notes/page-filename (dec index) :ext ""))}
          (fm/render fmt-config page-template)
          (handle-render-error dst)
          (util/write-file dst))))
