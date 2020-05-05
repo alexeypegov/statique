@@ -1,35 +1,28 @@
-(defproject statique "0.1.0-SNAPSHOT"
-  :description "Static blog generator"
-  :url "http://github.com/alexeypegov/statique"
-  :license {:name "Eclipse Public License"
-            :url "http://www.eclipse.org/legal/epl-v10.html"}
+(defproject statique "0.2.0-SNAPSHOT"
+  :description "Statique — static blog generator"
+  :url "https://github.com/alexeypegov/statique"
+  :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
+            :url  "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [slingshot "0.12.2"]
-                 [io.forward/yaml "1.0.6"]
-                 [com.atlassian.commonmark/commonmark "0.11.0"]
-                 [com.atlassian.commonmark/commonmark-ext-yaml-front-matter "0.11.0"]
-                 [com.atlassian.commonmark/commonmark-ext-gfm-strikethrough "0.11.0"]
-                 [org.freemarker/freemarker "2.3.27-incubating"]
+                 [io.forward/yaml "1.0.9"]
+                 [org.freemarker/freemarker "2.3.29"]
+                 [me.raynes/fs "1.4.6"]
+                 [org.clojure/tools.logging "1.1.0"]
+                 [ch.qos.logback/logback-classic "1.1.3"]
+                 [com.atlassian.commonmark/commonmark "0.14.0"]
+                 [com.atlassian.commonmark/commonmark-ext-yaml-front-matter "0.14.0"]
+                 [com.atlassian.commonmark/commonmark-ext-gfm-strikethrough "0.14.0"]
                  [http-kit "2.2.0"]
                  [org.clojure/data.json "0.2.6"]
-                 [me.raynes/fs "1.4.6"]
+                 [pandect "0.6.1"]
                  [clojure.java-time "0.3.2"]
                  [danlentz/clj-uuid "0.1.7"]
-                 [org.clojure/tools.cli "0.3.7"]
-                 [pandect "0.6.1"]]
-  :plugins [[lein-pprint "1.2.0"]
-            [lein-difftest "2.0.0"]
-            [lein-zprint "0.3.7"]
-            [lein-eftest "0.4.3"]
-            [lein-bin "0.3.4"]]
-  :profiles {:dev {:dependencies [[clj-stacktrace "0.2.8"]]
-                   :jvm-opts ["-Ddebug=true"]}
-             :prod {}}
-  :repl-options {:init-ns statique.core
-                 :caught clj-stacktrace.repl/pst+}
-  :main statique.core
-  ; lein with-profile prod bin
-  :bin {:name           "statique"
-        :bin-path       "~/bin"
-        :bootclasspath  true}
-  :aot [statique.media statique.core])
+                 [clojure.java-time "0.3.2"]]
+  :plugins [[lein-eftest "0.4.3"]
+            [lein-binplus "0.6.6"]]
+  :repl-options {:init-ns statique.core}
+  :aot [statique.markdown.media statique.core]
+  :bin {:name          "statique"
+        :bin-path      "bin"
+        :bootclasspath true}
+  :main statique.core)

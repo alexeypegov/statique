@@ -1,7 +1,6 @@
-(ns statique.renderers
+(ns statique.markdown.renderers
   (:require [clojure.string :as string]
-            [statique.noembed :as noembed]
-            [statique.logging :as log])
+            [statique.markdown.noembed :as noembed])
   (:import
     [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
@@ -12,7 +11,7 @@
      HtmlNodeRendererFactory
      HtmlNodeRendererContext]
     [org.commonmark.node Node CustomNode Link Text Image CustomNode AbstractVisitor]
-    [statique.media MediaNode]))
+    [statique.markdown.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com"])
 

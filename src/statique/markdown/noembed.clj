@@ -1,8 +1,7 @@
-(ns statique.noembed
+(ns statique.markdown.noembed
   (:require [org.httpkit.client :as http]
             [clojure.data.json :as json]
-            [clojure.java.io :as io]
-            [statique.logging :as log])
+            [clojure.java.io :as io])
   (:import [clojure.lang Atom]
            [java.io File]))
 
