@@ -5,7 +5,7 @@
             [statique.util :as u]
             [statique.freemarker :as fm]
             [statique.markdown.markdown :as md]
-            [statique.context :as ctx]
+            [statique.config :as cfg]
             [clj-uuid :as uuid])
   (:use [clojure.tools.logging :only [log warn error info]]))
 
@@ -26,11 +26,13 @@
    (not= target-crc target-crc-current)))
 
 (defn- make-item-map [cache-fn source-file]
-  (let [source-relative (u/relative-path ctx/root-dir source-file)
+  (let [root-dir        (cfg/general :root-dir)
+        source-relative (u/relative-path root-dir source-file)
         slug            (u/slug source-file)
         target-filename (str slug html-ext)
-        target-file     (fs/file ctx/output-dir target-filename)
-        target-relative (u/relative-path ctx/root-dir target-file)
+        output-dir      (cfg/general :output-dir)
+        target-file     (fs/file output-dir target-filename)
+        target-relative (u/relative-path root-dir target-file)
         absolute-link   (str "/" slug html-ext)
         target-crc      (u/crc32 target-file)
         source-crc      (u/crc32 source-file)
@@ -55,11 +57,13 @@
 
 (defn- make-page [{:keys [index items] :as page}]
   (let [filename        (page-filename index)
-        target-file     (fs/file ctx/output-dir filename)
-        target-relative (u/relative-path ctx/root-dir target-file)
+        root-dir        (cfg/general :root-dir)
+        output-dir      (cfg/general :output-dir)
+        target-file     (fs/file output-dir filename)
+        target-relative (u/relative-path root-dir target-file)
         target-crc      (u/crc32 target-file)
         items-hash      (hash (map :slug items))
-        cached          (get-in ctx/notes-cache [:pages index] {})]
+        cached          (get-in @cfg/notes-cache [:pages index] {})]
     (u/assoc? cached
               :type            :page
               :index           index
@@ -76,11 +80,13 @@
    (not (fs/exists? target-file))))
 
 (defn- make-feed [name]
-  (let [filename        (str name xml-ext) ;todo: how about json feeds?
-        target-file     (fs/file ctx/output-dir filename)
-        target-relative (u/relative-path ctx/root-dir target-file)
+  (let [filename        (str name xml-ext)
+        root-dir        (cfg/general :root-dir)
+        output-dir      (cfg/general :output-dir)
+        target-file     (fs/file output-dir filename)
+        target-relative (u/relative-path root-dir target-file)
         target-crc      (u/crc32 target-file)
-        cached          (get-in ctx/notes-cache [:feeds name] {})]
+        cached          (get-in @cfg/notes-cache [:feeds name] {})]
     (u/assoc? cached
               :type            :feed
               :name            name
@@ -90,7 +96,9 @@
               :target-crc      target-crc)))
 
 (defn- format-dates [date]
-  (let [parsed-date (u/parse-local-date ctx/date-format ctx/tz date)]
+  (let [date-format (cfg/general :date-format)
+        tz          (cfg/general :tz)
+        parsed-date (u/parse-local-date date-format tz date)]
     {:rfc-822  (u/rfc-822 parsed-date)
      :rfc-3339 (u/rfc-3339 parsed-date)}))
 
@@ -105,9 +113,9 @@
   (letfn [(write-file [data]
             (u/write-file target-file data)
             data)]
-    (info (format "Rendering \"%s\"..." (u/relative-path ctx/root-dir target-file)))
-    (->> (assoc vars :vars ctx/vars)
-         (ctx/fm-renderer template-name)
+    (info (format "Rendering \"%s\"..." (u/relative-path (cfg/general :root-dir) target-file)))
+    (->> (assoc vars :vars @cfg/vars)
+         (@cfg/fm-renderer template-name)
          (check-error)
          (write-file))))
 
@@ -117,14 +125,14 @@
 (defmethod render :page [{:keys [target-file items index next?] :as page}]
   (render-to-file page-template {:items items :ndx index :next? next?} target-file))
 (defmethod render :feed [{:keys [name items target-file] :as feed}]
-  (render-to-file name {:items items :base-url ctx/base-url :name name} target-file))
+  (render-to-file name {:items items :base-url (cfg/general :base-url) :name name} target-file))
 (defmethod render :single [{:keys [target-file] :as m}]
   (render-to-file single-template m target-file))
 (defmethod render :default [m]
   (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
 
 (defn- make-note-cache [result {:keys [note source-relative] :as m}]
-  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :rfc-822 :rfc-3339])))
+  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :rfc-822 :rfc-3339])))
 
 (defn- make-feed-cache [feeds]
   (when feeds
@@ -144,7 +152,7 @@
   (u/write-file file caches :data true))
 
 (defn- make-note [file]
-  (letfn [(cached [key] (get-in ctx/notes-cache [:notes key] {}))]
+  (letfn [(cached [key] (get-in @cfg/notes-cache [:notes key] {}))]
     (assoc (make-item-map cached file)
            :type :note)))
 
@@ -161,7 +169,8 @@
        (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
 
 (defn- render-feeds [{:keys [changed items] :as page}]
-  (->> (map make-feed ctx/feeds)
+  (->> (cfg/general :feeds)
+       (map make-feed)
        (map #(if (or changed (:changed %)) (assoc % :rendered (render (assoc % :items items))) %))
        (map #(if (or changed (:changed %)) (assoc % :target-crc (target-crc %)) %))))
 
@@ -172,22 +181,23 @@
        (map #(if (= 1 (:index %)) (assoc % :feeds (render-feeds %)) %))))
 
 (defn generate []
-  (when-let [notes-dir (u/validate-dir ctx/notes-dir)]
+  (when-let [notes-dir (u/validate-dir (cfg/general :notes-dir))]
     (dorun
      (->> (u/sorted-files notes-dir markdown-filter)
+          (reverse)
           (render-notes)
-          (u/paged-seq ctx/notes-per-page)
+          (u/paged-seq (cfg/general :notes-per-page))
           (render-pages)
           (reduce make-cache {})
-          (write-caches ctx/notes-cache-file)))))
+          (write-caches (cfg/notes-cache-file))))))
 
-(defn- make-single-page [file]
-  (letfn [(cached [key] (get ctx/singles-cache key {}))]
+(defn- make-single [file]
+  (letfn [(cached [key] (get @cfg/singles-cache key {}))]
     (assoc (make-item-map cached file)
            :type :single)))
 
-(defn- render-single-pages [files]
-  (->> (map make-single-page files)
+(defn- render-singles [files]
+  (->> (map make-single files)
        (map #(if (:changed %) (merge % (md/transform-file (:source-file %))) %))
        (map #(if (:changed %) (assoc % :rendered (render %)) %))
        (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
@@ -197,7 +207,7 @@
 
 (defn generate-singles []
   (dorun
-   (->> (u/list-files ctx/singles-dir markdown-filter)
-        (render-single-pages)
+   (->> (u/list-files (cfg/general :singles-dir) markdown-filter)
+        (render-singles)
         (reduce make-singles-cache {})
-        (write-caches ctx/singles-cache-file))))
+        (write-caches (cfg/singles-cache-file)))))

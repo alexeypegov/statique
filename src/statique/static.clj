@@ -1,6 +1,6 @@
 (ns statique.static
   (:require [clojure.java.io :as io]
-            [statique.context :as ctx]
+            [statique.config :as cfg]
             [me.raynes.fs :as fs])
   (:use [clojure.tools.logging :only [log warn error info]]))
 
@@ -14,8 +14,10 @@
   (fs/copy-dir dir dst-dir))
 
 (defn copy []
+  (let [output-dir (cfg/general :output-dir)
+        copy (cfg/general :copy)]
   (letfn [(do-copy [item] (when (fs/exists? item)
                             (if (fs/directory? item)
-                              (copy-dir item ctx/output-dir)
-                              (copy-file item ctx/output-dir))))]
-    (dorun (map do-copy ctx/copy))))
+                              (copy-dir item output-dir)
+                              (copy-file item output-dir))))]
+    (dorun (map do-copy copy)))))

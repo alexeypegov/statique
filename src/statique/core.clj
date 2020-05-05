@@ -3,7 +3,7 @@
             [statique.util :as u]
             [statique.notes :as n]
             [statique.static :as s]
-            [statique.context :as ctx])
+            [statique.config :as cfg])
   (:gen-class))
 
 (def ^:private working-dir (u/working-dir))
@@ -12,13 +12,13 @@
   (let [file (io/as-file path)]
     (and
       (.isDirectory file)
-      (.exists (io/file path ctx/config-name)))))
+      (.exists (io/file path cfg/config-name)))))
 
 (defn -main [& args]
-  (printf "Statique %s\n\n" ctx/app-version)
+  (printf "Statique %s\n\n" cfg/app-version)
   (if (blog-dir? working-dir)
     (do
       (n/generate)
       (n/generate-singles)
       (s/copy))
-    (printf "Unable to find config file (%s) in \"%s\"\n" ctx/config-name working-dir)))
+    (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir)))

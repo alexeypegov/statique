@@ -1,4 +1,4 @@
-(ns statique.context
+(ns statique.config
   (:require [clojure.java.io :as io]
             [clojure.string :as s]
             [me.raynes.fs :as fs]
@@ -11,12 +11,10 @@
 
 (def ^:private convert-to-symbols true)
 
-
 (def ^:private statique-string    (format "Statique %s" app-version))
 (def ^:private statique-link      (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>" statique-string))
 
 (def ^:private default-config     {:general {:notes-dir       "notes/"
-                                             :pages-dir       nil
                                              :theme-dir       "theme/"
                                              :output-dir      "./out/"
                                              :cache-dir       "cache/"
@@ -25,11 +23,9 @@
                                              :tz              "Europe/Moscow"
                                              :base-url        "/"
                                              :feeds           ["rss"]
-                                             :pages           nil
-                                             :copy            nil
-                                             :keep            nil}
+                                             :singles-dir     "singles/"
+                                             :copy            nil}
                                    :vars {}})
-
 
 (defn- with-defaults
   [config]
@@ -43,8 +39,8 @@
 (defn- append-statique-vars
   [config]
   (->> (assoc (:vars config)
-         :statique      statique-string
-         :statique-link statique-link)
+              :statique      statique-string
+              :statique-link statique-link)
        (assoc config :vars)))
 
 (defn- parse-config
@@ -70,76 +66,39 @@
            (make-fm-config)
            (partial fm/render)))
 
-(defonce config
-  (->> (u/working-dir)
-       (parse-config)))
+(def ^:private config
+  (delay
+   (->> (u/working-dir)
+        (parse-config))))
 
-(defn- general [& keys]
+(defn general [& keys]
   (->> (conj keys :general)
-       (get-in config)))
+       (get-in @config)))
 
-(defn- cache-file [name]
+(def vars
+  (delay (:vars @config)))
+
+(defn cache-file [name]
   (->> (format "%s.edn" name)
        (fs/file (general :cache-dir))))
 
-(defn- read-cache [name]
+(defn read-cache [name]
   (->> (cache-file name)
        (u/read-edn)))
 
-(defonce vars
-  (:vars config))
+(def fm-renderer
+  (delay
+   (->> (general :theme-dir)
+        (make-fm-renderer))))
 
-(defonce base-url
-  (general :base-url))
+(def notes-cache
+  (delay (read-cache "notes")))
 
-(def root-dir
-  (general :root-dir))
-
-(defonce output-dir
-  (general :output-dir))
-
-(defonce notes-dir
-  (general :notes-dir))
-
-(defonce pages-dir
-  (general :pages-dir))
-
-(defonce theme-dir
-  (general :theme-dir))
-
-(defonce notes-per-page
-  (general :notes-per-page))
-
-(defonce date-format
-  (general :date-format))
-
-(defonce tz
-  (general :tz))
-
-(defonce base-url
-  (general :base-url))
-
-(defonce feeds
-  (general :feeds))
-
-(defonce fm-renderer
-  (->> (general :theme-dir)
-       (make-fm-renderer)))
-
-(defonce notes-cache
-  (read-cache "notes"))
-
-(defonce notes-cache-file
+(defn notes-cache-file []
   (cache-file "notes"))
 
-(defonce copy
-  (general :copy))
+(def singles-cache
+  (delay (read-cache "singles")))
 
-(defonce singles-dir
-  (general :singles-dir))
-
-(defonce singles-cache
-  (read-cache "singles"))
-
-(defonce singles-cache-file
+(defn singles-cache-file []
   (cache-file "singles"))
