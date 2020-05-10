@@ -8,10 +8,11 @@
 (def ^:private working-dir (io/file "/working-dir/"))
 
 (defn setup [f]
-  (with-redefs [cfg/general (fn [key] (key {:root-dir    working-dir
-                                            :date-format "yyyy-MM-dd"
-                                            :tz          "Europe/Moscow"
-                                            :output-dir  (io/file working-dir "out/")}))
+  (with-redefs [cfg/general (fn [key] (key {:root-dir        working-dir
+                                            :date-format     "yyyy-MM-dd"
+                                            :tz              "Europe/Moscow"
+                                            :output-dir      (io/file working-dir "out/")
+                                            :index-page-name "index"}))
                 u/crc32     (constantly 777)]
     (f)))
 
@@ -152,8 +153,8 @@
 
 (deftest check-error
   (let [check-error #'n/check-error]
-    (with-redefs [u/exit (fn [code] (str "exited code=" code))]
-      (is (= "exited code=-1"
+    (with-redefs [u/exit (fn [code message] (str code " " message))]
+      (is (= "-1 something"
              (check-error {:status :error :message "something" :model {:fail true}})))
       (is (= "yay"
              (check-error {:status :ok :result "yay"}))))))

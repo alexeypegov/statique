@@ -16,16 +16,20 @@
 
 (def ^:private default-config     {:general {:notes-dir       "notes/"
                                              :theme-dir       "theme/"
-                                             :output-dir      "./out/"
+                                             :singles-dir     "singles/"
                                              :cache-dir       "cache/"
+                                             :note-template   "note"
+                                             :page-template   "page"
+                                             :index-page-name "index"
+                                             :single-template "single"
+                                             :output-dir      "./out/"
                                              :notes-per-page  10
                                              :date-format     "yyyy-MM-dd"
                                              :tz              "Europe/Moscow"
                                              :base-url        "/"
-                                             :feeds           ["rss"]
-                                             :singles-dir     "singles/"
+                                             :feeds           nil
                                              :copy            nil}
-                                   :vars {}})
+                                   :vars    {}})
 
 (defn- with-defaults
   [config]

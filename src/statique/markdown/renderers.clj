@@ -73,7 +73,8 @@
             height  (read-string (str (:height data)))
             ratio   (* (float (/ (min width height) (max width height))) 100)]
         (doto writer
-          (.tag "div" {"class" "media" "style" (str "padding-top: " ratio "%;")})
+          #_(.tag "div" {"class" "media" "style" (str "padding-top: " ratio "%;")})
+          (.tag "div" {"class" "media"})
           (.raw (or html url))
           (.tag "/div")))
       (doto writer

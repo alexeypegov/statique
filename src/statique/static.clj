@@ -5,12 +5,12 @@
   (:use [clojure.tools.logging :only [log warn error info]]))
 
 (defn- copy-file [file dst-dir]
-  (info (format "Copying \"%s\"..." file))
+  (println (format "Copying \"%s\"..." file))
   (let [filename (fs/base-name file)]
     (fs/copy+ file (io/file dst-dir filename))))
 
 (defn- copy-dir [dir dst-dir]
-  (info (format "Copying \"%s\"..." dir))
+  (println (format "Copying \"%s\"..." dir))
   (fs/copy-dir dir dst-dir))
 
 (defn copy []

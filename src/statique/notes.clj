@@ -11,13 +11,10 @@
 
 (def ^:private html-ext         ".html")
 (def ^:private xml-ext          ".xml")
-(def ^:private note-template    "note")
-(def ^:private page-template    "index")
-(def ^:private single-template  "single")
 (def ^:private markdown-filter  (u/postfix-filter ".md"))
 
 (defmulti page-filename identity)
-(defmethod page-filename 1        [_] (str "index" html-ext))
+(defmethod page-filename 1        [_] (str (cfg/general :index-page-name) html-ext))
 (defmethod page-filename :default [i] (str "page-" i html-ext))
 
 (defn- item-changed? [{:keys [source-crc target-crc]} source-crc-current target-crc-current]
@@ -104,16 +101,13 @@
 
 (defmulti check-error :status)
 (defmethod check-error :ok [{:keys [result]}] result)
-(defmethod check-error :error [{:keys [message model]}]
-  (error "Error rendering model" model)
-  (error message)
-  (u/exit -1))
+(defmethod check-error :error [{:keys [message]}] (u/exit -1 message))
 
 (defn- render-to-file [template-name vars target-file]
   (letfn [(write-file [data]
             (u/write-file target-file data)
             data)]
-    (info (format "Rendering \"%s\"..." (u/relative-path (cfg/general :root-dir) target-file)))
+    (println (format "Rendering \"%s\"..." (u/relative-path (cfg/general :root-dir) target-file)))
     (->> (assoc vars :vars @cfg/vars)
          (@cfg/fm-renderer template-name)
          (check-error)
@@ -121,13 +115,17 @@
 
 (defmulti ^:private render :type)
 (defmethod render :note [{:keys [target-file] :as m}]
-  (render-to-file note-template {:note m} target-file))
+  (let [template (cfg/general :note-template)]
+    (render-to-file template {:note m} target-file)))
 (defmethod render :page [{:keys [target-file items index next?] :as page}]
-  (render-to-file page-template {:items items :ndx index :next? next?} target-file))
+  (let [template (cfg/general :page-template)]
+    (render-to-file template {:items items :ndx index :next? next?} target-file)))
 (defmethod render :feed [{:keys [name items target-file] :as feed}]
-  (render-to-file name {:items items :base-url (cfg/general :base-url) :name name} target-file))
+  (let [base-url (cfg/general :base-url)]
+    (render-to-file name {:items items :base-url base-url :name name} target-file)))
 (defmethod render :single [{:keys [target-file] :as m}]
-  (render-to-file single-template m target-file))
+  (let [template (cfg/general :single-template)]
+    (render-to-file template m target-file)))
 (defmethod render :default [m]
   (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
 
@@ -180,7 +178,7 @@
        (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))
        (map #(if (= 1 (:index %)) (assoc % :feeds (render-feeds %)) %))))
 
-(defn generate []
+(defn generate-notes []
   (when-let [notes-dir (u/validate-dir (cfg/general :notes-dir))]
     (dorun
      (->> (u/sorted-files notes-dir markdown-filter)

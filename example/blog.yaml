@@ -1,0 +1,63 @@
+#
+# Blog configuration file
+#
+---
+general:
+  # note files (*.md) will be searched there, relative to working directory, "notes/" by default
+  notes-dir: notes/
+
+  # directory to look for FreeMarker templates in, relatve to working directory, "theme/" by default
+  theme-dir: theme/
+
+  # Directory to generate and copy files to, relative to working directory, default is "./out/"
+  output-dir: ./out/
+
+  # Direcroty of standalone pages
+  singles-dir: singles/
+
+  # Cache files location, default is "cache/"
+  cache-dir: cache/
+
+  # Number of notes per a single page, 10 by default
+  notes-per-page: 10
+
+  # Name of the note template file (used to render single notes) excluding "ftl" extension,
+  #  all templates are read from theme directory, default is "note"
+  note-template: note
+
+  # Name of Freemarker template used for render pages, default is "page"
+  page-template: page
+
+  # Name of the index page (i.e. index.html), default is "index"
+  index-page-name: index
+
+  # Name of template used to render single pages, default is "single"
+  single-template: single
+
+  # Format of the date used in note files in Date meta, default is "yyyy-MM-dd"
+  date-format: yyyy-MM-dd
+
+  # Timezone name, used for feed dates, default is "Europe/Moscow"
+  tz: Europe/Moscow
+
+  # Base URL used for feeds generation
+  base-url: /
+
+  # List of feeds to generate, default is none, templates should have same names
+  feeds:
+    - atom
+
+  # List of static files and directories to copy, directories are copied recursively, default is none
+  copy:
+    - static/robots.txt
+    - static/CNAME
+    - notes/images
+
+# Custom variables that are passed as "vars" object into all templates
+# Please, note that all dashes in variable names are replaced to underscores in Freemarker!
+vars:
+  blog-title: Blog title
+  blog-url: https://staticblog.com
+  feed-url: https://staticblog.com/atom.xml
+  feed-author: Vasya Pupkin
+  feed-email: vasya@staticblog.com

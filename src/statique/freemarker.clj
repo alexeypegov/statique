@@ -4,9 +4,9 @@
   (:import [freemarker.template Template Configuration DefaultObjectWrapper TemplateExceptionHandler TemplateException]
            [java.io File StringWriter]))
 
-(def ^:private def-ext      ".ftl")
-(def ^:private def-encoding "UTF-8")
-(def ^:private separator    File/separatorChar)
+(def ^:private template-extension      "ftl")
+(def ^:private def-encoding            "UTF-8")
+(def ^:private separator               File/separatorChar)
 
 (defn make-config
   ([template-dir] (make-config template-dir def-encoding))
@@ -19,7 +19,7 @@
      (.setLogTemplateExceptions false)
      (.setWrapUncheckedExceptions true))))
 
-(defn m->model
+(defn replace-hyphens
   [m]
   (let [stringify (fn [[k v]]
                     (if (keyword? k)
@@ -31,19 +31,19 @@
               m)))
 
 (defn render [^Configuration cfg template-name params]
-  (let [name     (str template-name def-ext)
-        template (.getTemplate cfg name)
-        model    (m->model params)
-        writer   (StringWriter.)]
+  (let [filename (format "%s.%s" template-name template-extension)
+        model    (replace-hyphens params)]
     (try
-      (assoc {}
-             :status :ok
-             :result (do
-                       (.process template model writer)
-                       (.toString writer)))
+      (let [template (.getTemplate cfg filename)
+            writer   (StringWriter.)]
+        (assoc {}
+               :status :ok
+               :result (do
+                         (.process template model writer)
+                         (.toString writer))))
       (catch TemplateException ex
         (assoc {}
                :status   :error
-               :template template-name
+               :template filename
                :model    model
                :message  (.getMessage ex))))))

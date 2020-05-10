@@ -18,7 +18,7 @@
   (printf "Statique %s\n\n" cfg/app-version)
   (if (blog-dir? working-dir)
     (do
-      (n/generate)
+      (n/generate-notes)
       (n/generate-singles)
       (s/copy))
     (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir)))
