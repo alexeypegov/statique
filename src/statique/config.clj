@@ -4,6 +4,9 @@
             [me.raynes.fs :as fs]
             [statique.util :as u]
             [statique.freemarker :as fm]
+            [statique.markdown.markdown :as md]
+            [statique.markdown.renderers :as r]
+            [statique.markdown.noembed :as noembed]
             [yaml.core :as yaml]))
 
 (def config-name                  "blog.yaml")
@@ -106,3 +109,13 @@
 
 (defn singles-cache-file []
   (cache-file "singles"))
+
+(defn noembed-cache-file []
+  (cache-file "noembed"))
+
+(def noembed-cache
+  (delay
+    (u/file-cache (noembed-cache-file) (fn [url] (noembed/fetch url)))))
+
+(def markdown-extensions
+  (delay (conj md/default-extensions (r/media-extension @noembed-cache))))

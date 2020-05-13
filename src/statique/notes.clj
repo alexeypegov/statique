@@ -149,6 +149,9 @@
 (defn- write-caches [file caches]
   (u/write-file file caches :data true))
 
+(defn- write-noembed-cache []
+  (u/write-file (cfg/noembed-cache-file) (@cfg/noembed-cache :all) :data true))
+
 (defn- make-note [file]
   (letfn [(cached [key] (get-in @cfg/notes-cache [:notes key] {}))]
     (assoc (make-item-map cached file)
@@ -160,7 +163,7 @@
 
 (defn- render-notes [files]
   (->> (map make-note files)
-       (map #(if (:changed %) (merge % (md/transform-file (:source-file %))) %))
+       (map #(if (:changed %) (merge % (md/transform-file (:source-file %) :extensions @cfg/markdown-extensions)) %))
        (map #(if (:changed %) (merge % (format-dates (:date %))) %))
        (remove :draft)
        (map #(if (:changed %) (assoc % :rendered (render %)) %))
@@ -187,7 +190,8 @@
           (u/paged-seq (cfg/general :notes-per-page))
           (render-pages)
           (reduce make-cache {})
-          (write-caches (cfg/notes-cache-file))))))
+          (write-caches (cfg/notes-cache-file)))
+     (write-noembed-cache))))
 
 (defn- make-single [file]
   (letfn [(cached [key] (get @cfg/singles-cache key {}))]

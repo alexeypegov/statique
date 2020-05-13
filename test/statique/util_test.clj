@@ -20,9 +20,9 @@
     {:a 1 :b 2 :c 3} {:a 1 :b 2} [:c 3 :d nil]
     {:a 1 :c '()}    {:a 1}      [:c '()]))
 
-(deftest cache
+(deftest file-cache
   (with-redefs [u/read-edn (constantly {"b" 100})]
-    (let [cache (u/cache (io/file "non-existing.edn") (fn [k] (if-not (= :nothing k) (apply str (repeat 3 k)))))]
+    (let [cache (u/file-cache (io/file "non-existing.edn") (fn [k] (if-not (= :nothing k) (apply str (repeat 3 k)))))]
       (are [result key] (= result (cache key))
         {"b" 100}   :all
         "aaa"       "a"

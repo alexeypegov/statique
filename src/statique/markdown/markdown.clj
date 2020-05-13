@@ -1,7 +1,6 @@
 (ns statique.markdown.markdown
   (:require [clojure.java.io :as io]
-            [clojure.string :as s]
-            [statique.markdown.renderers :as r])
+            [clojure.string :as s])
   (:import [org.commonmark.parser Parser]
            [org.commonmark.renderer.html HtmlRenderer]
            [org.commonmark.ext.gfm.strikethrough StrikethroughExtension]
@@ -10,18 +9,18 @@
 
 (def ^:private array-values ["Tags"])
 
-(defn- string->node
-  ([s] (string->node s nil))
-  ([s base-url]
-   (let [extensions [(StrikethroughExtension/create) (YamlFrontMatterExtension/create) (r/media-extension base-url)]]
-     (-> (doto (Parser/builder) (.extensions extensions))
-         .build
-         (.parse s)))))
+(defonce default-extensions
+   [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
+
+(defn- string->node [text extensions base-url]
+  (-> (doto (Parser/builder) (.extensions extensions))
+      (.build)
+      (.parse text)))
 
 (defn- node->html
-  [node]
-  (-> (doto (HtmlRenderer/builder) (.extensions [(StrikethroughExtension/create) (r/media-extension)]))
-      .build
+  [node extensions]
+  (-> (doto (HtmlRenderer/builder) (.extensions extensions))
+      (.build)
       (.render node)))
 
 (defn- map-meta-values
@@ -32,17 +31,14 @@
   [node]
   (let [meta-visitor (YamlFrontMatterVisitor.)]
     (.accept node meta-visitor)
-    (-> (.getData meta-visitor)
-        map-meta-values)))
+    (-> meta-visitor
+        (.getData)
+        (map-meta-values))))
 
-(defn transform
-  ([s] (transform nil s))
-  ([base-url s]
-   (let [node (string->node s base-url)]
-     (merge {:body (node->html node)} (get-meta node)))))
+(defn transform [text & {:keys [extensions base-url] :or {extensions default-extensions}}]
+  (let [node (string->node text extensions base-url)]
+    (assoc (get-meta node) :body (node->html node extensions))))
 
-(defn transform-file
-  ([file] (transform-file nil file))
-  ([base-url file]
-   (->> (slurp file)
-        (transform base-url))))
+(defn transform-file [file & {:keys [extensions base-url] :or {extensions default-extensions}}]
+  (-> (slurp file)
+      (transform :extensions extensions :base-url base-url)))

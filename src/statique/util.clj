@@ -121,7 +121,7 @@
            (spit file))
       (spit file content :encoding "UTF-8"))))
 
-(defn cache
+(defn file-cache
   "Returns a caching function that calculates a value using new-fn or returns previously calculated one if any,
    returns the whole cache if ':all' is passed as a key, nils are not cached!"
   [file new-fn]
