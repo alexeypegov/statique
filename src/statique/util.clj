@@ -120,3 +120,18 @@
            (with-out-str)
            (spit file))
       (spit file content :encoding "UTF-8"))))
+
+(defn cache
+  "Returns a caching function that calculates a value using new-fn or returns previously calculated one if any,
+   returns the whole cache if ':all' is passed as a key, nils are not cached!"
+  [file new-fn]
+  (let [m (atom (read-edn file))]
+    (fn [key]
+      {:pre [(or (keyword? key) (string? key)) (fn? new-fn)]}
+      (if (= :all key)
+        @m
+        (if-let [existing (get @m key)]
+          existing
+          (when-let [new (new-fn key)]
+            (swap! m assoc key new)
+            new))))))
