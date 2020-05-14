@@ -14,31 +14,29 @@
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com"])
 
-(defn- url?
-  "Checks whatever s is an URL, i.e. starts with URL prefix"
-  [s]
+(defn- url? [s]
   (or
    (string/starts-with? s "http://")
    (string/starts-with? s "https://")))
 
-(defn- process-link-node
-  "Checks whatever given node is an URL and replaces it with a MediaNode if needed"
-  [node]
-  (let [text (.getLiteral node)]
-    (when (url? text)
-      (let [host (.getHost (java.net.URL. text))]
-        (if (some #(string/ends-with? host %) media-services)
-          (doto node
-            (.insertAfter (MediaNode. text))
-            (.unlink))
-          (let [link (Link. text nil)]
-            (.appendChild link (Text. text))
-            (doto node
-              (.insertAfter link)
-              (.unlink))))))))
+(defn- get-host [text]
+  (when (url? text)
+    (.getHost (java.net.URL. text))))
 
-(defn- link-visitor
-  []
+(defn- process-link-node [node]
+  (let [text (.getLiteral node)]
+    (when-let [host (get-host text)]
+      (if (some #(string/ends-with? host %) media-services)
+        (doto node
+          (.insertAfter (MediaNode. text))
+          (.unlink))
+        (let [link (Link. text nil)]
+          (.appendChild link (Text. text))
+          (doto node
+            (.insertAfter link)
+            (.unlink)))))))
+
+(defn- link-visitor []
   (let [link-counter (atom 0)]
     (proxy [AbstractVisitor] []
       (visit [node]
@@ -53,36 +51,28 @@
             (swap! link-counter dec))
           :else (proxy-super visitChildren node))))))
 
-(defn- image-visitor
-  [base-url]
+(defn- image-visitor [base-url]
   (proxy [AbstractVisitor] []
     (visit [node]
       (if (instance? Image node)
         (.setDestination node (format "%s%s" base-url (.getDestination node)))
         (proxy-super visitChildren node)))))
 
-(defn- write-media-html
-  [node writer noembed]
-  (let [url   (.getUrl node)
-        data  (noembed url)
-        html  (:html data)
-        width (:width data)]
-    (if (some? width)
-      (let [width   (read-string (str width))
-            height  (read-string (str (:height data)))
-            ratio   (* (float (/ (min width height) (max width height))) 100)]
-        (doto writer
-          #_(.tag "div" {"class" "media" "style" (str "padding-top: " ratio "%;")})
-          (.tag "div" {"class" "media"})
-          (.raw (or html url))
-          (.tag "/div")))
+(defn- write-media-html [node writer noembed]
+  (let [url (.getUrl node)]
+    (if-let [data (noembed url)]
+      (doto writer
+        (.tag "div" {"class"       "media"
+                     "data-width"  (str (:width data))
+                     "data-height" (str (:height data))})
+        (.raw (or (:html data) url))
+        (.tag "/div"))
       (doto writer
         (.tag "a" {"href" url})
         (.text url)
         (.tag "/a")))))
 
-(defn- media-node-renderer
-  [context noembed]
+(defn- media-node-renderer [context noembed]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
@@ -94,8 +84,7 @@
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (media-node-renderer context fetcher))))
 
-(defn- post-processor
-  [base-url]
+(defn- post-processor [base-url]
   (reify PostProcessor
     (^Node process [_ ^Node node]
       (.accept node (link-visitor))

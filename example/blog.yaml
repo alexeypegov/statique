@@ -41,7 +41,7 @@ general:
   tz: Europe/Moscow
 
   # Base URL used for feeds generation
-  base-url: /
+  base-url: https://staticblog.com/
 
   # List of feeds to generate, default is none, templates should have same names
   feeds:

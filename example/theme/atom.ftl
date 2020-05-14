@@ -12,17 +12,15 @@
       <link href="${vars.blog_url}${note.link}" />
       <id>urn:uuid:${note.uuid}</id>
       <updated>${note.rfc_3339}</updated>
-      <#if description?exists>
       <content type="xhtml">
         <div xmlns="http://www.w3.org/1999/xhtml">
-        ${note.html}
+        ${note.body_abs}
         </div>
       </content>
       <author>
         <name>${vars.feed_author}</name>
         <email>${vars.feed_email}</email>
       </author>
-      </#if>
     </entry>
   </#list>
 </feed>

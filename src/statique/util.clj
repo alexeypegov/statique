@@ -87,7 +87,7 @@
   {:pre (even? (count pairs))}
   (as-> pairs $
     (partition 2 $)
-    (filter second $)
+    (filter #(some? (second %)) $)
     (apply concat $)
     (if (seq $)
       (apply assoc m $)

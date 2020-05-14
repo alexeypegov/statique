@@ -52,7 +52,7 @@
    (not= items-hash items-hash-current)
    (true? (some :changed items))))
 
-(defn- make-page [{:keys [index items] :as page}]
+(defn- make-page [{:keys [index items next?] :as page}]
   (let [filename        (page-filename index)
         root-dir        (cfg/general :root-dir)
         output-dir      (cfg/general :output-dir)
@@ -64,6 +64,7 @@
     (u/assoc? cached
               :type            :page
               :index           index
+              :next?           next?
               :target-file     target-file
               :target-relative target-relative
               :changed         (page-changed? cached target-crc items-hash)
@@ -119,7 +120,13 @@
     (render-to-file template {:note m} target-file)))
 (defmethod render :page [{:keys [target-file items index next?] :as page}]
   (let [template (cfg/general :page-template)]
-    (render-to-file template {:items items :ndx index :next? next?} target-file)))
+    (render-to-file template
+                    {:items     items
+                     :ndx       index
+                     :next?     next?
+                     :next-page (when next? (page-filename (inc index)))
+                     :prev-page (when (> index 1) (page-filename (dec index)))}
+                    target-file)))
 (defmethod render :feed [{:keys [name items target-file] :as feed}]
   (let [base-url (cfg/general :base-url)]
     (render-to-file name {:items items :base-url base-url :name name} target-file)))
@@ -130,7 +137,7 @@
   (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
 
 (defn- make-note-cache [result {:keys [note source-relative] :as m}]
-  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :rfc-822 :rfc-3339])))
+  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :tags :rfc-822 :rfc-3339])))
 
 (defn- make-feed-cache [feeds]
   (when feeds
@@ -163,7 +170,10 @@
 
 (defn- render-notes [files]
   (->> (map make-note files)
-       (map #(if (:changed %) (merge % (md/transform-file (:source-file %) :extensions @cfg/markdown-extensions)) %))
+       (map #(if (:changed %)
+               (let [text (slurp (:source-file %))]
+                 (-> (merge % (md/transform text :extensions @cfg/markdown-extensions))
+                     (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs))))) %))
        (map #(if (:changed %) (merge % (format-dates (:date %))) %))
        (remove :draft)
        (map #(if (:changed %) (assoc % :rendered (render %)) %))

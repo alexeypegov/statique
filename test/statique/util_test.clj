@@ -14,11 +14,12 @@
 
 (deftest assoc?
   (are [result           existing    new] (= result (apply (partial u/assoc? existing) new))
-    {:a 1 :b 2}      {}          [:a 1 :b 2]
-    {:a 1 :b 2 :c 3} {:a 1 :b 2} [:c 3]
-    {:a 1 :b 2}      {:a 1 :b 2} [:c nil]
-    {:a 1 :b 2 :c 3} {:a 1 :b 2} [:c 3 :d nil]
-    {:a 1 :c '()}    {:a 1}      [:c '()]))
+    {:a 1 :b 2}          {}          [:a 1 :b 2]
+    {:a 1 :b 2 :c 3}     {:a 1 :b 2} [:c 3]
+    {:a 1 :b 2 :c false} {:a 1 :b 2} [:c false]
+    {:a 1 :b 2}          {:a 1 :b 2} [:c nil]
+    {:a 1 :b 2 :c 3}     {:a 1 :b 2} [:c 3 :d nil]
+    {:a 1 :c '()}        {:a 1}      [:c '()]))
 
 (deftest file-cache
   (with-redefs [u/read-edn (constantly {"b" 100})]

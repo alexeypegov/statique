@@ -1,6 +1,5 @@
 (ns statique.markdown.markdown
-  (:require [clojure.java.io :as io]
-            [clojure.string :as s])
+  (:require [clojure.string :as s])
   (:import [org.commonmark.parser Parser]
            [org.commonmark.renderer.html HtmlRenderer]
            [org.commonmark.ext.gfm.strikethrough StrikethroughExtension]
@@ -12,7 +11,7 @@
 (defonce default-extensions
    [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
 
-(defn- string->node [text extensions base-url]
+(defn- string->node [text extensions]
   (-> (doto (Parser/builder) (.extensions extensions))
       (.build)
       (.parse text)))
@@ -35,10 +34,10 @@
         (.getData)
         (map-meta-values))))
 
-(defn transform [text & {:keys [extensions base-url] :or {extensions default-extensions}}]
-  (let [node (string->node text extensions base-url)]
+(defn transform [text & {:keys [extensions] :or {extensions default-extensions}}]
+  (let [node (string->node text extensions)]
     (assoc (get-meta node) :body (node->html node extensions))))
 
-(defn transform-file [file & {:keys [extensions base-url] :or {extensions default-extensions}}]
+(defn transform-file [file & {:keys [extensions] :or {extensions default-extensions}}]
   (-> (slurp file)
-      (transform :extensions extensions :base-url base-url)))
+      (transform :extensions extensions)))

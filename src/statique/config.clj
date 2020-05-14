@@ -119,3 +119,6 @@
 
 (def markdown-extensions
   (delay (conj md/default-extensions (r/media-extension @noembed-cache))))
+
+(def markdown-extensions-abs
+  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :base-url)))))
