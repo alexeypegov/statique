@@ -62,7 +62,7 @@
   (doto writer
     (.tag "a" {"href" url})
     (.text url)
-    (.tag "/div")))
+    (.tag "/a")))
 
 (defn- write-media-html [node writer noembed]
   (let [url (.getUrl node)]
