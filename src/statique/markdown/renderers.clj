@@ -58,19 +58,22 @@
         (.setDestination node (format "%s%s" base-url (.getDestination node)))
         (proxy-super visitChildren node)))))
 
+(defn- error-url [writer url]
+  (doto writer
+    (.tag "a" {"href" url})
+    (.text url)
+    (.tag "/div")))
+
 (defn- write-media-html [node writer noembed]
   (let [url (.getUrl node)]
-    (if-let [data (noembed url)]
-      (doto writer
-        (.tag "div" {"class"       "media"
-                     "data-width"  (str (:width data))
-                     "data-height" (str (:height data))})
-        (.raw (or (:html data) url))
-        (.tag "/div"))
-      (doto writer
-        (.tag "a" {"href" url})
-        (.text url)
-        (.tag "/a")))))
+    (if-let [{:keys [error html]} (noembed url)]
+      (if html
+        (doto writer
+          (.tag "div" {"class" "media"})
+          (.raw html)
+          (.tag "/div"))
+        (error-url writer url))
+      (error-url writer url))))
 
 (defn- media-node-renderer [context noembed]
   (let [writer (.getWriter context)]

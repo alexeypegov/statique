@@ -8,8 +8,12 @@
 (defn fetch [url]
   (let [options              {:query-params {:url url}}
         {:keys [body error]} @(http/get noembed-url options)]
-    (when-not error
+    (if-not error
       (try
-        (json/read-str body :key-fn keyword)
+        (let [{:keys [error html] :as data} (json/read-str body :key-fn keyword)]
+          (if error
+            data
+            {:html html}))
         (catch Throwable e
-          (log/warn (.getMessage e)))))))
+          (log/warn url (.getMessage e))))
+      (log/warn url error))))
