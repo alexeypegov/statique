@@ -137,7 +137,7 @@
   (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
 
 (defn- make-note-cache [result {:keys [note source-relative] :as m}]
-  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :tags :rfc-822 :rfc-3339])))
+  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :tags :rfc-822 :rfc-3339 :body :body-abs])))
 
 (defn- make-feed-cache [feeds]
   (when feeds
