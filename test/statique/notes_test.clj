@@ -55,19 +55,17 @@
 
 (deftest page-changed?
   (let [page-changed? #'n/page-changed?]
-    (are [result target-crc-current items-crc-current page] (= result (page-changed? page target-crc-current items-crc-current))
-      true  1 nil {}
-      true  2 nil {:target-crc 1}
-      true  1 1   {:target-crc 1}
-      true  1 2   {:target-crc 1
-                   :items-hash 1}
-      true  1 2   {:target-crc 1
-                   :items-hash 2
-                   :items      '({:changed true})}
-      false 1 2   {:target-crc 1
-                   :items-hash 2
-                   :items      '({:changed false}
-                                 {:changed false})})))
+    (are [result target-crc-current items-crc-current items page] (= result (page-changed? page items target-crc-current items-crc-current))
+      true  1 nil [] {}
+      true  2 nil [] {:target-crc 1}
+      true  1 1   [] {:target-crc 1}
+      true  1 2   [] {:target-crc 1
+                      :items-hash 1}
+      true  1 2   '({:changed true}) {:target-crc 1
+                                      :items-hash 2}
+      false 1 2   '({:changed false}
+                    {:changed false}) {:target-crc 1
+                                       :items-hash 2})))
 
 (deftest make-page
   (with-redefs [cfg/notes-cache (delay {:pages {1 {:target-crc 666}}})]
