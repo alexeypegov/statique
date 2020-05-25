@@ -12,7 +12,7 @@
    [org.commonmark.node Node CustomNode Link Text Image CustomNode AbstractVisitor]
    [statique.markdown.media MediaNode]))
 
-(def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com"])
+(def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com" "twitter.com" "soundcloud.com"])
 
 (defn- url? [s]
   (or
@@ -58,22 +58,36 @@
         (.setDestination node (format "%s%s" base-url (.getDestination node)))
         (proxy-super visitChildren node)))))
 
-(defn- error-url [writer url]
+(defmulti ^:private typed-media (fn [{:keys [error type]} writer] (if error
+                                                                     :error
+                                                                     (case     type
+                                                                       "photo" :photo
+                                                                       "video" :rich
+                                                                       "rich"  :rich
+                                                                               :unknown))))
+(defmethod typed-media :error [{:keys [error url]} writer]
   (doto writer
     (.tag "a" {"href" url})
-    (.text url)
+    (.text error)
+    (.tag "/a")))
+(defmethod typed-media :photo [{:keys [media_url]} writer]
+  (doto writer
+    (.tag "img" {"src" media_url})))
+(defmethod typed-media :rich [{:keys [html provider_name]} writer]
+  (doto writer
+    (.tag "div" {"class" "media" "data-provider" provider_name})
+    (.raw html)
+    (.tag "/div")))
+(defmethod typed-media :unknown [{:keys [url title]} writer]
+  (doto writer
+    (.tag "a" {"href" url})
+    (.text title)
     (.tag "/a")))
 
 (defn- write-media-html [node writer noembed]
   (let [url (.getUrl node)]
-    (if-let [{:keys [error html]} (noembed url)]
-      (if html
-        (doto writer
-          (.tag "div" {"class" "media"})
-          (.raw html)
-          (.tag "/div"))
-        (error-url writer url))
-      (error-url writer url))))
+    (if-let [data (noembed url)]
+      (typed-media data writer))))
 
 (defn- media-node-renderer [context noembed]
   (let [writer (.getWriter context)]

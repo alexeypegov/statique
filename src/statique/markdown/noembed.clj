@@ -10,10 +10,7 @@
         {:keys [body error]} @(http/get noembed-url options)]
     (if-not error
       (try
-        (let [{:keys [error html] :as data} (json/read-str body :key-fn keyword)]
-          (if error
-            data
-            {:html html}))
+        (json/read-str body :key-fn keyword)
         (catch Throwable e
           (log/warn url (.getMessage e))))
       (log/warn url error))))
