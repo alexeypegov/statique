@@ -46,7 +46,7 @@
            :source-crc      source-crc
            :target-crc      target-crc)))
 
-(defn- page-changed? [{:keys [target-crc items-hash items]} target-crc-current items-hash-current]
+(defn- page-changed? [{:keys [target-crc items-hash]} items target-crc-current items-hash-current]
   (or
    (not= target-crc target-crc-current)
    (not= items-hash items-hash-current)
@@ -67,7 +67,7 @@
               :next?           next?
               :target-file     target-file
               :target-relative target-relative
-              :changed         (page-changed? cached target-crc items-hash)
+              :changed         (page-changed? cached items target-crc items-hash)
               :target-crc      target-crc
               :items           items
               :items-hash      items-hash)))
@@ -173,7 +173,8 @@
        (map #(if (:changed %)
                (let [text (slurp (:source-file %))]
                  (-> (merge % (md/transform text :extensions @cfg/markdown-extensions))
-                     (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs))))) %))
+                     (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs)))))
+               %))
        (map #(if (:changed %) (merge % (format-dates (:date %))) %))
        (remove :draft)
        (map #(if (:changed %) (assoc % :rendered (render %)) %))
