@@ -1,4 +1,4 @@
-(defproject statique "0.2.6"
+(defproject statique "0.2.7"
   :description "Statique — static blog generator"
   :url "https://github.com/alexeypegov/statique"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
@@ -9,9 +9,9 @@
                  [me.raynes/fs "1.4.6"]
                  [org.clojure/tools.logging "1.1.0"]
                  [ch.qos.logback/logback-classic "1.2.3"]
-                 [com.atlassian.commonmark/commonmark "0.17.0"]
-                 [com.atlassian.commonmark/commonmark-ext-yaml-front-matter "0.17.0"]
-                 [com.atlassian.commonmark/commonmark-ext-gfm-strikethrough "0.17.0"]
+                 [org.commonmark/commonmark "0.18.1"]
+                 [org.commonmark/commonmark-ext-yaml-front-matter "0.18.1"]
+                 [org.commonmark/commonmark-ext-gfm-strikethrough "0.18.1"]
                  [http-kit "2.5.3"]
                  [org.clojure/data.json "2.3.1"]
                  [pandect "1.0.1"]

@@ -17,21 +17,21 @@
 (def ^:private statique-string    (format "Statique %s" app-version))
 (def ^:private statique-link      (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>" statique-string))
 
-(def ^:private default-config     {:general {:notes-dir       "notes/"
-                                             :theme-dir       "theme/"
-                                             :singles-dir     "singles/"
-                                             :cache-dir       "cache/"
-                                             :note-template   "note"
-                                             :page-template   "page"
-                                             :index-page-name "index"
-                                             :single-template "single"
-                                             :output-dir      "./out/"
-                                             :notes-per-page  10
-                                             :date-format     "yyyy-MM-dd"
-                                             :tz              "Europe/Moscow"
-                                             :base-url        "/"
-                                             :feeds           nil
-                                             :copy            nil}
+(def ^:private default-config     {:general {:notes-dir        "notes/"
+                                             :theme-dir        "theme/"
+                                             :singles-dir      "singles/"
+                                             :cache-dir        "cache/"
+                                             :note-template    "note"
+                                             :page-template    "page"
+                                             :index-page-name  "index"
+                                             :single-template  "single"
+                                             :output-dir       "./out/"
+                                             :notes-per-page   10
+                                             :date-format      "yyyy-MM-dd"
+                                             :tz               "Europe/Moscow"
+                                             :base-url         "/"
+                                             :feeds            nil
+                                             :copy             nil}
                                    :vars    {}})
 
 (defn- with-defaults

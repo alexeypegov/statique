@@ -8,8 +8,9 @@
     HtmlRenderer$HtmlRendererExtension
     HtmlRenderer$Builder
     HtmlNodeRendererFactory
-    HtmlNodeRendererContext]
-   [org.commonmark.node Node CustomNode Link Text Image CustomNode AbstractVisitor]
+    HtmlNodeRendererContext
+    CoreHtmlNodeRenderer]
+   [org.commonmark.node Node CustomNode Link Text Image CustomNode Document Paragraph AbstractVisitor]
    [statique.markdown.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com" "twitter.com" "soundcloud.com"])
@@ -72,12 +73,17 @@
     (.tag "/a")))
 (defmethod typed-media :photo [{:keys [media_url]} writer]
   (doto writer
-    (.tag "img" {"src" media_url})))
-(defmethod typed-media :rich [{:keys [html provider_name]} writer]
-  (doto writer
-    (.tag "div" {"class" "media" "data-provider" provider_name})
-    (.raw html)
-    (.tag "/div")))
+    (.tag "img" {"src" media_url "loading" "lazy"})))
+(defmethod typed-media :rich [{:keys [thumbnail_url thumbnail_width thumbnail_height url title html provider_name]} writer]
+  (if true ; disable thumbnails
+    (doto writer
+      (.tag "div" {"class" "media" "data-rovider" provider_name})
+      (.raw html)
+      (.tag "/div"))
+    (doto writer
+      (.tag "a" {"href" url "data-provider" provider_name})
+      (.tag "img" {"src" thumbnail_url "width" (str thumbnail_width) "height" (str thumbnail_height) "title" title "loading" "lazy"})
+      (.tag "/a"))))
 (defmethod typed-media :unknown [{:keys [url title]} writer]
   (doto writer
     (.tag "a" {"href" url})
@@ -96,10 +102,24 @@
       (^void render [_ ^Node node]
         (write-media-html node writer noembed)))))
 
+; disabled
+(defn- skip-parent-para-renderer [context]
+  (proxy [CoreHtmlNodeRenderer] [^HtmlNodeRendererContext context]
+     (getNodeTypes [] #{Paragraph})
+     (^void render [^Node node]
+       (if (instance? Document (.getParent node))
+         (proxy-super visitChildren node)
+         (proxy-super visit node)))))
+
 (defn- html-node-renderer-factory [fetcher]
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (media-node-renderer context fetcher))))
+
+(defn- skip-parent-para-renderer-factory []
+  (reify HtmlNodeRendererFactory
+    (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
+      (skip-parent-para-renderer context))))
 
 (defn- post-processor [base-url]
   (reify PostProcessor
@@ -120,4 +140,5 @@
      HtmlRenderer$HtmlRendererExtension
      (^void extend
        [_ ^HtmlRenderer$Builder rendererBuilder]
-       (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed))))))
+       (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed))
+       #_(.nodeRendererFactory rendererBuilder (skip-parent-para-renderer-factory))))))
