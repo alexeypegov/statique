@@ -108,47 +108,6 @@
             :rfc-3339 "2020-04-22T00:00:00+03:00"}
            (format-dates "2020-04-22")))))
 
-(deftest make-cache
-  (let [make-cache #'n/make-cache]
-    (is (= {:pages {1 {:items-hash 1
-                       :target-crc 1
-                       :rendered   "html"}}
-            :notes {"note1" {:rendered   "html"
-                             :source-crc 1
-                             :target-crc 3}
-                    "note2" {:rendered   "html"
-                             :source-crc 33
-                             :target-crc 35}}}
-           (make-cache {} {:index                 1
-                           :target-crc            1
-                           :items-hash            1
-                           :some-unknown-property "yay"
-                           :rendered              "html"
-                           :items                 '({:source-relative "note1"
-                                                     :source-crc      1
-                                                     :target-crc      3
-                                                     :something-else  5
-                                                     :rendered        "html"}
-                                                    {:source-relative  "note2"
-                                                     :source-crc       33
-                                                     :target-crc       35
-                                                     :ignored-property "blahblah"
-                                                     :rendered         "html"})})))
-    (is (= {:pages {2 {}}
-            :notes {}
-            :feeds {"rss"  {:target-crc 1
-                            :rendered   "xml"}
-                    "atom" {:target-crc 4
-                            :rendered   "xml"}}}
-           (make-cache {} {:index 2
-                           :feeds '({:name       "rss"
-                                     :target-crc 1
-                                     :rendered   "xml"}
-                                    {:name             "atom"
-                                     :target-crc       4
-                                     :rendered         "xml"
-                                     :unknown-property "yeah"})})))))
-
 (deftest check-error
   (let [check-error #'n/check-error]
     (with-redefs [u/exit (fn [code message] (str code " " message))]

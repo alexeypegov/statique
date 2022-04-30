@@ -17,21 +17,22 @@
 (def ^:private statique-string    (format "Statique %s" app-version))
 (def ^:private statique-link      (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>" statique-string))
 
-(def ^:private default-config     {:general {:notes-dir        "notes/"
-                                             :theme-dir        "theme/"
-                                             :singles-dir      "singles/"
-                                             :cache-dir        "cache/"
-                                             :note-template    "note"
-                                             :page-template    "page"
-                                             :index-page-name  "index"
-                                             :single-template  "single"
-                                             :output-dir       "./out/"
-                                             :notes-per-page   10
-                                             :date-format      "yyyy-MM-dd"
-                                             :tz               "Europe/Moscow"
-                                             :base-url         "/"
-                                             :feeds            nil
-                                             :copy             nil}
+(def ^:private default-config     {:general {:notes-dir        			"notes/"
+                                             :theme-dir        			"theme/"
+                                             :singles-dir      			"singles/"
+                                             :cache-dir        			"cache/"
+                                             :note-template    			"note"
+                                             :page-template    			"page"
+                                             :index-page-name  			"index"
+                                             :single-template  			"single"
+                                             :output-dir       			"./out/"
+                                             :notes-per-page  				10
+                                             :date-format      			"yyyy-MM-dd"
+                                             :tz               			"Europe/Moscow" ; TODO: make it local
+                                             :base-url         			"/"
+                                             :items-per-feed						10
+                                             :feeds            			nil
+                                             :copy             			nil}
                                    :vars    {}})
 
 (defn- with-defaults
@@ -59,37 +60,43 @@
       (append-statique-vars)
       (assoc-in [:general :root-dir] working-dir)))
 
-(defn- template-file [theme-dir template-name]
+(defn- template-file 
+  [theme-dir template-name]
   (fs/file theme-dir (format "%s.ftl" template-name)))
-
-(defn- make-fm-config [theme-dir]
-  (let [note-template (template-file theme-dir "note")]
-    (if (fs/exists? note-template)
-      (fm/make-config theme-dir)
-      (u/exit -1 (format "Error: template '%s' was not found" note-template)))))
-
-(defn- make-fm-renderer [theme-dir]
-  (some->> (u/validate-dir theme-dir)
-           (make-fm-config)
-           (partial fm/render)))
 
 (def ^:private config
   (delay
    (->> (u/working-dir)
         (parse-config))))
 
-(defn general [& keys]
+(defn general 
+  [& keys]
   (->> (conj keys :general)
        (get-in @config)))
+
+(defn- make-fm-config 
+  [theme-dir]
+  (let [note-template (template-file theme-dir (general :note-template))]
+    (if (fs/exists? note-template)
+      (fm/make-config theme-dir)
+      (u/exit -1 (format "Error: template '%s' was not found" note-template)))))
+
+(defn- make-fm-renderer 
+  [theme-dir]
+  (some->> (u/validate-dir theme-dir)
+           (make-fm-config)
+           (partial fm/render)))
 
 (def vars
   (delay (:vars @config)))
 
-(defn cache-file [name]
+(defn cache-file 
+  [name]
   (->> (format "%s.edn" name)
        (fs/file (general :cache-dir))))
 
-(defn read-cache [name]
+(defn read-cache 
+  [name]
   (->> (cache-file name)
        (u/read-edn)))
 
@@ -98,24 +105,27 @@
    (->> (general :theme-dir)
         (make-fm-renderer))))
 
-(def notes-cache
-  (delay (read-cache "notes")))
+(def notes-cache (delay (read-cache "notes")))
 
-(defn notes-cache-file []
-  (cache-file "notes"))
+(def pages-cache (delay (read-cache "pages")))
 
-(def singles-cache
-  (delay (read-cache "singles")))
+(def feeds-cache (delay (read-cache "feeds")))
 
-(defn singles-cache-file []
-  (cache-file "singles"))
+(def singles-cache (delay (read-cache "singles")))
 
-(defn noembed-cache-file []
-  (cache-file "noembed"))
+(def notes-cache-file (delay (cache-file "notes")))
+
+(def page-cache-file (delay (cache-file "pages")))
+
+(def feeds-cache-file (delay (cache-file "feeds")))
+
+(def singles-cache-file (delay (cache-file "singles")))
+
+(def noembed-cache-file (delay (cache-file "noembed")))
 
 (def noembed-cache
   (delay
-    (u/file-cache (noembed-cache-file) (fn [url] (noembed/fetch url)))))
+    (u/file-cache @noembed-cache-file (fn [url] (noembed/fetch url)))))
 
 (def markdown-extensions
   (delay (conj md/default-extensions (r/media-extension @noembed-cache))))

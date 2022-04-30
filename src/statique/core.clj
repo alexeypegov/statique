@@ -8,17 +8,20 @@
 
 (def ^:private working-dir (u/working-dir))
 
-(defn- blog-dir? [path]
+(defn- blog-dir? 
+  [path]
   (let [file (io/as-file path)]
     (and
       (.isDirectory file)
       (.exists (io/file path cfg/config-name)))))
 
-(defn -main [& args]
+(defn -main 
+  []
   (printf "Statique %s\n\n" cfg/app-version)
   (if (blog-dir? working-dir)
     (do
-      (n/generate-notes)
+      (n/generate-notes-and-pages)
       (n/generate-singles)
       (s/copy))
-    (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir)))
+    (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir))
+  (flush))

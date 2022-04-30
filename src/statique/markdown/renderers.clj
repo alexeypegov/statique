@@ -1,30 +1,32 @@
 (ns statique.markdown.renderers
   (:require [clojure.string :as string])
   (:import
-   [org.commonmark.parser Parser Parser$ParserExtension Parser$Builder PostProcessor]
+   [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
    [org.commonmark.renderer NodeRenderer]
    [org.commonmark.renderer.html
-    HtmlRenderer
     HtmlRenderer$HtmlRendererExtension
     HtmlRenderer$Builder
     HtmlNodeRendererFactory
     HtmlNodeRendererContext
     CoreHtmlNodeRenderer]
-   [org.commonmark.node Node CustomNode Link Text Image CustomNode Document Paragraph AbstractVisitor]
+   [org.commonmark.node Node Link Text Image Document Paragraph AbstractVisitor]
    [statique.markdown.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com" "twitter.com" "soundcloud.com"])
 
-(defn- url? [s]
+(defn- url? 
+  [s]
   (or
    (string/starts-with? s "http://")
    (string/starts-with? s "https://")))
 
-(defn- get-host [text]
+(defn- get-host 
+  [text]
   (when (url? text)
     (.getHost (java.net.URL. text))))
 
-(defn- process-link-node [node]
+(defn- process-link-node 
+  [node]
   (let [text (.getLiteral node)]
     (when-let [host (get-host text)]
       (if (some #(string/ends-with? host %) media-services)
@@ -37,7 +39,8 @@
             (.insertAfter link)
             (.unlink)))))))
 
-(defn- link-visitor []
+(defn- link-visitor 
+  []
   (let [link-counter (atom 0)]
     (proxy [AbstractVisitor] []
       (visit [node]
@@ -52,29 +55,33 @@
             (swap! link-counter dec))
           :else (proxy-super visitChildren node))))))
 
-(defn- image-visitor [base-url]
+(defn- image-visitor 
+  [base-url]
   (proxy [AbstractVisitor] []
     (visit [node]
       (if (instance? Image node)
         (.setDestination node (format "%s%s" base-url (.getDestination node)))
         (proxy-super visitChildren node)))))
 
-(defmulti ^:private typed-media (fn [{:keys [error type]} writer] (if error
+(defmulti ^:private typed-media (fn [{:keys [error type]} _] (if error
                                                                      :error
                                                                      (case     type
                                                                        "photo" :photo
                                                                        "video" :rich
                                                                        "rich"  :rich
                                                                                :unknown))))
-(defmethod typed-media :error [{:keys [error url]} writer]
+(defmethod typed-media :error 
+  [{:keys [error url]} writer]
   (doto writer
     (.tag "a" {"href" url})
     (.text error)
     (.tag "/a")))
-(defmethod typed-media :photo [{:keys [media_url]} writer]
+(defmethod typed-media :photo 
+  [{:keys [media_url]} writer]
   (doto writer
     (.tag "img" {"src" media_url "loading" "lazy"})))
-(defmethod typed-media :rich [{:keys [thumbnail_url thumbnail_width thumbnail_height url title html provider_name]} writer]
+(defmethod typed-media :rich 
+  [{:keys [thumbnail_url thumbnail_width thumbnail_height url title html provider_name]} writer]
   (if true ; disable thumbnails
     (doto writer
       (.tag "div" {"class" "media" "data-rovider" provider_name})
@@ -84,18 +91,21 @@
       (.tag "a" {"href" url "data-provider" provider_name})
       (.tag "img" {"src" thumbnail_url "width" (str thumbnail_width) "height" (str thumbnail_height) "title" title "loading" "lazy"})
       (.tag "/a"))))
-(defmethod typed-media :unknown [{:keys [url title]} writer]
+(defmethod typed-media :unknown 
+  [{:keys [url title]} writer]
   (doto writer
     (.tag "a" {"href" url})
     (.text title)
     (.tag "/a")))
 
-(defn- write-media-html [node writer noembed]
+(defn- write-media-html 
+  [node writer noembed]
   (let [url (.getUrl node)]
-    (if-let [data (noembed url)]
+    (when-let [data (noembed url)]
       (typed-media data writer))))
 
-(defn- media-node-renderer [context noembed]
+(defn- media-node-renderer 
+  [context noembed]
   (let [writer (.getWriter context)]
     (reify NodeRenderer
       (getNodeTypes [_] #{MediaNode})
@@ -103,7 +113,8 @@
         (write-media-html node writer noembed)))))
 
 ; disabled
-(defn- skip-parent-para-renderer [context]
+(defn- skip-parent-para-renderer 
+  [context]
   (proxy [CoreHtmlNodeRenderer] [^HtmlNodeRendererContext context]
      (getNodeTypes [] #{Paragraph})
      (^void render [^Node node]
@@ -111,17 +122,20 @@
          (proxy-super visitChildren node)
          (proxy-super visit node)))))
 
-(defn- html-node-renderer-factory [fetcher]
+(defn- html-node-renderer-factory 
+  [fetcher]
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (media-node-renderer context fetcher))))
 
-(defn- skip-parent-para-renderer-factory []
+#_(defn- skip-parent-para-renderer-factory 
+  []
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (skip-parent-para-renderer context))))
 
-(defn- post-processor [base-url]
+(defn- post-processor 
+  [base-url]
   (reify PostProcessor
     (^Node process [_ ^Node node]
       (.accept node (link-visitor))

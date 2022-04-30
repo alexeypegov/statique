@@ -11,7 +11,8 @@
 (defonce default-extensions
    [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
 
-(defn- string->node [text extensions]
+(defn- string->node 
+  [text extensions]
   (-> (doto (Parser/builder) (.extensions extensions))
       (.build)
       (.parse text)))
@@ -34,10 +35,12 @@
         (.getData)
         (map-meta-values))))
 
-(defn transform [text & {:keys [extensions] :or {extensions default-extensions}}]
+(defn transform 
+  [text & {:keys [extensions] :or {extensions default-extensions}}]
   (let [node (string->node text extensions)]
     (assoc (get-meta node) :body (node->html node extensions))))
 
-(defn transform-file [file & {:keys [extensions] :or {extensions default-extensions}}]
+(defn transform-file 
+  [file & {:keys [extensions] :or {extensions default-extensions}}]
   (-> (slurp file)
       (transform :extensions extensions)))

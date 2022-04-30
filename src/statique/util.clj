@@ -5,15 +5,16 @@
             [java-time :as time]
             [pandect.algo.crc32 :as crc])
   (:import [java.util Properties]
-           [java.io File FilenameFilter]
+           [java.io FilenameFilter]
            [java.time.format DateTimeFormatter]
-           [java.io File FilenameFilter]
-           [java.time LocalDate]))
+           [java.io FilenameFilter]))
 
-(defn working-dir []
+(defn working-dir 
+  []
   (io/file (System/getProperty "user.dir")))
 
-(defn get-version [dep]
+(defn get-version 
+  [dep]
   (let [path  (str "META-INF/maven/" (or (namespace dep) (name dep)) "/" (name dep) "/pom.properties")]
     (when-let [props (io/resource path)]
       (with-open [stream (io/input-stream props)]
@@ -28,7 +29,7 @@
   (System/exit status))
 
 (defn list-files
-  ([dir] (list-files nil))
+  ; ([] (list-files nil))
   ([dir name-filter] (.listFiles dir name-filter))
   ([dir name-filter comparator]
    (->> (list-files dir name-filter)
@@ -36,7 +37,8 @@
 
 (def name-comparator (fn [a b] (compare (.getName a) (.getName b))))
 
-(defn sorted-files [dir name-filter]
+(defn sorted-files 
+  [dir name-filter]
   (list-files dir name-filter name-comparator))
 
 (defn postfix-filter
@@ -45,7 +47,8 @@
   (reify FilenameFilter
     (accept [_ _ name] (s/ends-with? name postfix))))
 
-(defn relative-path [root file]
+(defn relative-path 
+  [root file]
   (-> (.toPath root)
       (.relativize (.toPath file))
       (.toString)))
@@ -78,7 +81,7 @@
         (cons
          {:index index
           :items items
-          :next? (not (empty? rest))}
+          :next? (boolean (seq rest))}
          (paged-seq page-size rest (inc index))))))))
 
 (defn assoc?
@@ -100,19 +103,24 @@
   (let [local-date (time/local-date format date)]
     (.atStartOfDay local-date (time/zone-id tz))))
 
-(defn rfc-822 [datetime]
+(defn rfc-822 
+  [datetime]
   (.format DateTimeFormatter/RFC_1123_DATE_TIME datetime))
 
-(defn rfc-3339 [datetime]
+(defn rfc-3339 
+  [datetime]
   (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
 
-(defn slug [file]
+(defn slug 
+  [file]
   (s/lower-case (fs/base-name file true)))
 
-(defn crc32 [file]
+(defn crc32 
+  [file]
   (when (fs/exists? file) (crc/crc32 file)))
 
-(defn write-file [path ^String content & {:keys [data] :or {data false}}]
+(defn write-file 
+  [path ^String content & {:keys [data] :or {data false}}]
   (let [file (io/file path)]
     (fs/mkdirs (fs/parent file))
     (if data
