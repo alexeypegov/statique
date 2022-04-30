@@ -6,7 +6,7 @@ Static blog generator written in Clojure
 
 - Notes and standalone blog pages in [Markdown][1] with [YAML metadata][2]
 - [Freemarker][3] templates for rendering notes, standalone pages and feeds ([RSS][4], [Atom][5])
-- Suport for rech content like Youtube, Vimeo videos and Flickr photos with their URLs via [noembed][6]
+- Suport for rech content like Youtube, Vimeo videos and Flickr photos with their URLs via [][6]
 - Incremental rendering of changed notes/pages
 - Support of drafts
 
@@ -43,4 +43,4 @@ your option) any later version.
 [3]: https://freemarker.apache.org/
 [4]: https://www.rssboard.org/rss-specification
 [5]: https://validator.w3.org/feed/docs/atom.html
-[6]. https://noembed.com
+[6]: https://noembed.com
