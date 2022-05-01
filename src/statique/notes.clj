@@ -207,6 +207,7 @@
 (defn- render-notes 
   [files]
   (->> (map make-note files)
+       (u/prev-next #(assoc %1 :prev (:slug %3) :next (:slug %2)))
        (map #(if (:changed %)
                (let [text (slurp (:source-file %))]
                  (-> (merge % (md/transform text :extensions @cfg/markdown-extensions))
@@ -219,7 +220,7 @@
 
 (defn- render-feeds 
   [items]
-  (let [changed (some? (first (filter :changed items)))]
+  (let [changed (true? (some :changed items))]
     (->> (cfg/general :feeds)
        (map make-feed)
        (map #(if (or changed (:changed %)) (assoc % :rendered (render (assoc % :items items))) %))

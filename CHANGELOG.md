@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.9
+
+## Added 'note.prev' and 'note.next' vars in note template
+
 ## 0.2.8
 
 ### Added

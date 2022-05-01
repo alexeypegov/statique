@@ -84,6 +84,19 @@
           :next? (boolean (seq rest))}
          (paged-seq page-size rest (inc index))))))))
 
+(defn prev-next
+  "Lazily iterates over collection applying (fn cur, prev, next) to each element of a collection"
+  ([cb col]
+   (prev-next cb nil col))
+  ([cb prev col]
+   (lazy-seq 
+    (when (not-empty col)
+      (let [n 			(first col)
+            next (second col)]
+        (cons 
+          (cb n prev next)
+          (prev-next cb n (rest col))))))))
+
 (defn assoc?
   "Associates all non-empty values"
   [m & pairs]
