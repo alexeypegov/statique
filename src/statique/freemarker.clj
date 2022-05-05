@@ -1,6 +1,6 @@
 (ns statique.freemarker
   (:require [clojure.walk :as walk])
-  (:import [freemarker.template Configuration DefaultObjectWrapper TemplateExceptionHandler TemplateException]
+  (:import [freemarker.template Configuration DefaultObjectWrapper TemplateExceptionHandler]
            [java.io StringWriter]))
 
 (def ^:private template-extension      "ftl")
@@ -40,7 +40,7 @@
                :result (do
                          (.process template model writer)
                          (.toString writer))))
-      (catch TemplateException ex
+      (catch Exception ex
         (assoc {}
                :status   :error
                :template filename
