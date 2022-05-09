@@ -95,37 +95,63 @@
   (->> (format "%s.edn" name)
        (fs/file (general :cache-dir))))
 
+(defn- skip-cache-prop-name
+  [cache-name]
+  (str "skip-" cache-name "-cache"))
+
+(defn skip-cache?
+  [cache-name]
+  (->> (skip-cache-prop-name cache-name)
+       (System/getProperty)
+       (Boolean/valueOf)
+       (boolean)))
+
 (defn read-cache 
   [name]
-  (->> (cache-file name)
-       (u/read-edn)))
+  (if (skip-cache? name)
+    		(do
+        (printf "Skipping %s cache...\n" name)
+        {})
+      (->> (cache-file name)
+       (u/read-edn))))
+
+(defn write-cache
+  [name data]
+  (when (not (skip-cache? name))
+    (printf "Writing %s cache...\n" name)
+    (let [file (cache-file name)]
+    		(u/write-file file data :data true))))
 
 (def fm-renderer
   (delay
    (->> (general :theme-dir)
         (make-fm-renderer))))
 
-(def notes-cache (delay (read-cache "notes")))
+(def notes-cache-name "notes")
 
-(def pages-cache (delay (read-cache "pages")))
+(def pages-cache-name "pages")
 
-(def feeds-cache (delay (read-cache "feeds")))
+(def feeds-cache-name "feeds")
 
-(def singles-cache (delay (read-cache "singles")))
+(def singles-cache-name "singles")
 
-(def notes-cache-file (delay (cache-file "notes")))
+(def noembed-cache-name "noembed")
 
-(def page-cache-file (delay (cache-file "pages")))
+(def notes-cache (delay (read-cache notes-cache-name)))
 
-(def feeds-cache-file (delay (cache-file "feeds")))
+(def pages-cache (delay (read-cache pages-cache-name)))
 
-(def singles-cache-file (delay (cache-file "singles")))
+(def feeds-cache (delay (read-cache feeds-cache-name)))
 
-(def noembed-cache-file (delay (cache-file "noembed")))
+(def singles-cache (delay (read-cache singles-cache-name)))
+
+(def noembed-cache-file (delay (cache-file noembed-cache-name)))
 
 (def noembed-cache
-  (delay
-    (u/file-cache @noembed-cache-file (fn [url] (noembed/fetch url)))))
+  (delay 
+    (if (skip-cache? noembed-cache-name)
+      {}
+    		(u/file-cache @noembed-cache-file (fn [url] (noembed/fetch url))))))
 
 (def markdown-extensions
   (delay (conj md/default-extensions (r/media-extension @noembed-cache))))

@@ -126,7 +126,7 @@
 (defmethod render :note 
   [{:keys [target-file] :as m}]
   (let [template (cfg/general :note-template)]
-    (render-to-file template {:note m} target-file)))
+    (render-to-file template m target-file)))
 
 (defmethod render :page 
   [{:keys [target-file items index next?]}]
@@ -153,10 +153,6 @@
   [m]
   (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
 
-(defn- write-caches 
-  [file caches]
-  (u/write-file file caches :data true))
-
 (defn- make-note-cache 
   [result {:keys [source-relative] :as m}]
   (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :tags :rfc-822 :rfc-3339 :body :body-abs])))
@@ -164,7 +160,7 @@
 (defn- dump-note-cache
   [notes]
   (->> (reduce make-note-cache {} notes)
-       (write-caches @cfg/notes-cache-file)))
+       (cfg/write-cache cfg/notes-cache-name)))
 
 (defn- make-page-cache
   [result {:keys [index] :as page}]
@@ -174,7 +170,7 @@
   [pages]
   (when (seq pages)
     (->> (reduce make-page-cache {} pages)
-         (write-caches @cfg/page-cache-file))))
+         (cfg/write-cache cfg/pages-cache-name))))
 
 (defn- make-feed-cache 
   [result {:keys [name] :as feed}]
@@ -184,13 +180,13 @@
   [feeds]
   (when (seq feeds)
     (->> (reduce make-feed-cache {} feeds)
-         (write-caches @cfg/feeds-cache-file))))
+         (cfg/write-cache cfg/feeds-cache-name))))
 
 (defn- dump-noembed-cache 
   []
   (let [data (@cfg/noembed-cache :all)]
     (when-not (empty? data)
-      (u/write-file @cfg/noembed-cache-file data :data true))))
+      (cfg/write-cache cfg/noembed-cache-name data))))
 
 (defn- make-note 
   [file]
@@ -273,7 +269,7 @@
   [singles]
   (when (seq singles)
 		  (->> (reduce make-singles-cache {} singles)
-		       (write-caches @cfg/singles-cache-file))))
+		       (cfg/write-cache cfg/singles-cache-name))))
 
 (defn generate-singles
   []
