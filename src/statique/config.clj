@@ -121,19 +121,17 @@
 
 (defn write-cache
   [name data]
-  (when (not (skip-cache? name))
-    (let [file (cache-file name)
+  (let [file (cache-file name)
           old  (get-cached-var name)]
     		(when (not (u/maps-equal? old data))
     				(printf "Writing %s cache...\n" name)
-        (u/write-file file data :data true)))))
+        (u/write-file file data :data true))))
 
 (defn force-write-cache
   [name data]
-  (when (not (skip-cache? name))
-    (let [file (cache-file name)]
-      (printf "Writing %s cache...\n" name)
-      (u/write-file file data :data true))))
+  (let [file (cache-file name)]
+    (printf "Writing %s cache...\n" name)
+    (u/write-file file data :data true)))
 
 (def fm-renderer
   (delay
