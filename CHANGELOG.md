@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Changed
+
+- Some caches won't be written if weren't changed
+
 ## 0.3.0
 
 ### Added 

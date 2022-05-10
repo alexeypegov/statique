@@ -1,4 +1,4 @@
-(defproject statique "0.3.0"
+(defproject statique "0.3.1"
   :description "Statique — static blog generator"
   :url "https://github.com/alexeypegov/statique"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"

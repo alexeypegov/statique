@@ -115,12 +115,25 @@
       (->> (cache-file name)
        (u/read-edn))))
 
+(defn- get-cached-var
+  [name]
+  @@(ns-resolve 'statique.config (symbol (str name "-cache"))))
+
 (defn write-cache
   [name data]
   (when (not (skip-cache? name))
-    (printf "Writing %s cache...\n" name)
+    (let [file (cache-file name)
+          old  (get-cached-var name)]
+    		(when (not (u/maps-equal? old data))
+    				(printf "Writing %s cache...\n" name)
+        (u/write-file file data :data true)))))
+
+(defn force-write-cache
+  [name data]
+  (when (not (skip-cache? name))
     (let [file (cache-file name)]
-    		(u/write-file file data :data true))))
+      (printf "Writing %s cache...\n" name)
+      (u/write-file file data :data true))))
 
 (def fm-renderer
   (delay

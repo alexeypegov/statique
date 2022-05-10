@@ -3,7 +3,8 @@
             [clojure.string :as s]
             [me.raynes.fs :as fs]
             [java-time :as time]
-            [pandect.algo.crc32 :as crc])
+            [pandect.algo.crc32 :as crc]
+            [clojure.data :as d])
   (:import [java.util Properties]
            [java.io FilenameFilter]
            [java.time.format DateTimeFormatter]
@@ -131,6 +132,11 @@
 (defn crc32 
   [file]
   (when (fs/exists? file) (crc/crc32 file)))
+
+(defn maps-equal?
+  [a b]
+  (let [[a1 b1] (d/diff a b)]
+    (and (empty? a1) (empty? b1))))
 
 (defn write-file 
   [path ^String content & {:keys [data] :or {data false}}]

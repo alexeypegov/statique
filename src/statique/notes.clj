@@ -186,7 +186,7 @@
   []
   (let [data (@cfg/noembed-cache :all)]
     (when-not (empty? data)
-      (cfg/write-cache cfg/noembed-cache-name data))))
+      (cfg/force-write-cache cfg/noembed-cache-name data))))
 
 (defn- make-note 
   [file]
