@@ -200,6 +200,12 @@
   {:pre [(fs/exists? target-file)]}
   (u/crc32 target-file))
 
+(defn- report-draft-notes
+  [{:keys [draft slug] :as note}]
+  (when (= "true" draft)
+    (printf "Draft skipped: %s\n" slug))
+  note)
+
 (defn- render-notes 
   [files]
   (->> (map make-note files)
@@ -210,7 +216,8 @@
                      (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs)))))
                %))
        (map #(if (:changed %) (merge % (format-dates (:date %))) %))
-       (remove :draft)
+       (map report-draft-notes)
+       (remove #(= "true" (:draft %)))
        (map #(if (:changed %) (assoc % :rendered (render %)) %))
        (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
 

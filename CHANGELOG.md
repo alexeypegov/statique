@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+### Fixed
+
+- Draft notes are now processed properly and treated as non-draft if "Draft: false" (plus draft notes are reported now)
+
 ## 0.3.2
 
 ### Fixed
