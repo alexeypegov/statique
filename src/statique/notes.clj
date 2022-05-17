@@ -16,13 +16,15 @@
 (defmethod page-filename :default [i] (str "page-" i html-ext))
 
 (defn- item-changed? 
-  [{:keys [source-crc target-crc]} source-crc-current target-crc-current]
+  [skip-key {:keys [source-crc target-crc]} source-crc-current target-crc-current]
   (or
    (not= source-crc source-crc-current)
-   (not= target-crc target-crc-current)))
+   (if-not (cfg/general skip-key)
+      (not= target-crc target-crc-current)
+      false)))
 
 (defn- make-item-map 
-  [cache-fn source-file]
+  [cache-fn skip-key source-file]
   (let [root-dir        (cfg/general :root-dir)
         source-relative (u/relative-path root-dir source-file)
         slug            (u/slug source-file)
@@ -42,16 +44,18 @@
            :slug            slug
            :link            absolute-link
            :uuid            (uuid/v3 uuid/+namespace-url+ absolute-link)
-           :changed         (item-changed? cached source-crc target-crc)
+           :changed         (item-changed? skip-key cached source-crc target-crc)
            :source-crc      source-crc
            :target-crc      target-crc)))
 
 (defn- page-changed? 
   [{:keys [target-crc items-hash]} items target-crc-current items-hash-current]
   (or
-   (not= target-crc target-crc-current)
-   (not= items-hash items-hash-current)
-   (true? (some :changed items))))
+		 			(not= items-hash items-hash-current)
+      (true? (some :changed items))
+      (if-not (cfg/general :skip-pages)
+        (not= target-crc target-crc-current)
+        false)))
 
 (defn- make-page 
   [{:keys [index items next?]}]
@@ -75,10 +79,10 @@
               :items-hash      items-hash)))
 
 (defn- feed-changed? 
-  [{:keys [target-crc]} target-file target-crc-current]
-  (or
-   (not= target-crc target-crc-current)
-   (not (fs/exists? target-file))))
+  [{:keys [target-crc]} target-crc-current]
+  (if-not (cfg/general :skip-feeds)
+    (not= target-crc target-crc-current)
+    false))
 
 (defn- make-feed 
   [name]
@@ -94,7 +98,7 @@
               :name            name
               :target-relative target-relative
               :target-file     target-file
-              :changed         (feed-changed? cached target-file target-crc)
+              :changed         (feed-changed? cached target-crc)
               :target-crc      target-crc)))
 
 (defn- format-dates 
@@ -111,9 +115,10 @@
 (defmethod check-error :error [{:keys [message]}] (u/exit -1 message))
 
 (defn- render-to-file 
-  [template-name vars target-file]
-  (letfn [(write-file [data]
-            (u/write-file target-file data)
+  [template-name vars skip-key target-file]
+  (letfn [(write-file [data]                     
+            (when (not (cfg/general skip-key))
+              (u/write-file target-file data))
             data)]
     (println (format "Rendering \"%s\"..." (u/relative-path (cfg/general :root-dir) target-file)))
     (->> (assoc vars :vars @cfg/vars)
@@ -126,7 +131,7 @@
 (defmethod render :note 
   [{:keys [target-file] :as m}]
   (let [template (cfg/general :note-template)]
-    (render-to-file template m target-file)))
+    (render-to-file template m :skip-notes target-file)))
 
 (defmethod render :page 
   [{:keys [target-file items index next?]}]
@@ -137,17 +142,26 @@
                      :next?     next?
                      :next-page (when next? (page-filename (inc index)))
                      :prev-page (when (> index 1) (page-filename (dec index)))}
+                    :skip-pages
                     target-file)))
 
 (defmethod render :feed 
   [{:keys [name items target-file]}]
   (let [base-url (cfg/general :base-url)]
-    (render-to-file name {:items items :base-url base-url :name name} target-file)))
+    (render-to-file name 
+                    {:items items 
+                     :base-url base-url 
+                     :name name} 
+                    :skip-feeds 
+                    target-file)))
 
 (defmethod render :single 
   [{:keys [target-file] :as m}]
   (let [template (cfg/general :single-template)]
-    (render-to-file template m target-file)))
+    (render-to-file template 
+                    m 
+                    :skip-singles 
+                    target-file)))
 
 (defmethod render :default 
   [m]
@@ -192,13 +206,14 @@
   [file]
   ; todo: extract cached fn to upper level
   (letfn [(cached [key] (get @cfg/notes-cache key {}))]
-    (-> (make-item-map cached file)
+    (-> (make-item-map cached :skip-notes file)
         (assoc :type :note))))
 
 (defn- target-crc 
   [{:keys [target-file]}]
-  {:pre [(fs/exists? target-file)]}
-  (u/crc32 target-file))
+  (if (fs/exists? target-file)
+    (u/crc32 target-file)
+    0))
 
 (defn- report-draft-notes
   [{:keys [draft slug] :as note}]
@@ -225,9 +240,9 @@
   [items]
   (let [changed (true? (some :changed items))]
     (->> (cfg/general :feeds)
-       (map make-feed)
-       (map #(if (or changed (:changed %)) (assoc % :rendered (render (assoc % :items items))) %))
-       (map #(if (or changed (:changed %)) (assoc % :target-crc (target-crc %)) %)))))
+       		(map make-feed)
+       		(map #(if (or changed (:changed %)) (assoc % :rendered (render (assoc % :items items))) %))
+       		(map #(if (or changed (:changed %)) (assoc % :target-crc (target-crc %)) %)))))
 
 (defn- render-pages 
   [pages]
@@ -258,7 +273,7 @@
 (defn- make-single 
   [file]
   (letfn [(cached [key] (get @cfg/singles-cache key {}))]
-    (assoc (make-item-map cached file)
+    (assoc (make-item-map cached :skip-singles file)
            :type :single)))
 
 (defn- render-singles 

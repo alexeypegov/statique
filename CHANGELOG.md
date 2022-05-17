@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+
+- skip-notes, skip-pages, skip-singles, skip-feeds config options of boolean type (default: false) to skip file generation of particular type
+
 ## 0.3.3
 
 ### Fixed
