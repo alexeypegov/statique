@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+### Added
+
+- While rendering an image, if it name contains "@2x", it will be rendered as an img tag with width set to "50%".
+- Adding "loading=lazy" to all Markdown images
+
 ## 0.4.0
 
 ### Added

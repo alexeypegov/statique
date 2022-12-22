@@ -1,16 +1,19 @@
 (ns statique.markdown.renderers
   (:require [clojure.string :as string])
   (:import
-   [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
-   [org.commonmark.renderer NodeRenderer]
-   [org.commonmark.renderer.html
-    HtmlRenderer$HtmlRendererExtension
-    HtmlRenderer$Builder
-    HtmlNodeRendererFactory
-    HtmlNodeRendererContext
-    CoreHtmlNodeRenderer]
-   [org.commonmark.node Node Link Text Image Document Paragraph AbstractVisitor]
-   [statique.markdown.media MediaNode]))
+    [java.util Map]
+    [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
+    [org.commonmark.renderer NodeRenderer]
+    [org.commonmark.renderer.html
+     HtmlRenderer$HtmlRendererExtension
+     HtmlRenderer$Builder
+     HtmlNodeRendererFactory
+     HtmlNodeRendererContext
+     AttributeProviderFactory
+     AttributeProviderContext
+     AttributeProvider]
+    [org.commonmark.node Node Link Text Image AbstractVisitor]
+    [statique.markdown.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "flickr.com" "coub.com" "twitter.com" "soundcloud.com"])
 
@@ -55,7 +58,7 @@
             (swap! link-counter dec))
           :else (proxy-super visitChildren node))))))
 
-(defn- image-visitor 
+(defn- add-baseurl-image-visitor 
   [base-url]
   (proxy [AbstractVisitor] []
     (visit [node]
@@ -113,7 +116,7 @@
         (write-media-html node writer noembed)))))
 
 ; disabled
-(defn- skip-parent-para-renderer 
+#_(defn- skip-parent-para-renderer 
   [context]
   (proxy [CoreHtmlNodeRenderer] [^HtmlNodeRendererContext context]
      (getNodeTypes [] #{Paragraph})
@@ -121,6 +124,15 @@
        (if (instance? Document (.getParent node))
          (proxy-super visitChildren node)
          (proxy-super visit node)))))
+
+(defn- image-attr-provider
+  []
+  (reify AttributeProvider
+    (^void setAttributes [_ ^Node node ^String _ ^Map attributes]
+           (when (instance? Image node)
+             (.put attributes "loading" "lazy")
+             (when (string/includes? (.getDestination node) "@2x")
+               (.put attributes "width" "50%"))))))
 
 (defn- html-node-renderer-factory 
   [fetcher]
@@ -134,13 +146,19 @@
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (skip-parent-para-renderer context))))
 
+(defn- attr-provider-factory
+  []
+  (reify AttributeProviderFactory
+    (^AttributeProvider create [_ ^AttributeProviderContext _]
+                        (image-attr-provider))))
+
 (defn- post-processor 
   [base-url]
   (reify PostProcessor
     (^Node process [_ ^Node node]
       (.accept node (link-visitor))
       (when base-url
-        (.accept node (image-visitor base-url)))
+        (.accept node (add-baseurl-image-visitor base-url)))
       node)))
 
 (defn media-extension
@@ -155,4 +173,5 @@
      (^void extend
        [_ ^HtmlRenderer$Builder rendererBuilder]
        (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed))
-       #_(.nodeRendererFactory rendererBuilder (skip-parent-para-renderer-factory))))))
+       #_(.nodeRendererFactory rendererBuilder (skip-parent-para-renderer-factory))
+       (.attributeProviderFactory rendererBuilder (attr-provider-factory))))))
