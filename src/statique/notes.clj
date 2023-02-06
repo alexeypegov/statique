@@ -279,7 +279,7 @@
 (defn- render-singles 
   [files]
   (->> (map make-single files)
-       (map #(if (:changed %) (merge % (md/transform-file (:source-file %))) %))
+       (map #(if (:changed %) (merge % (md/transform-file (:source-file %) :extensions @cfg/markdown-extensions)) %))
        (map #(if (:changed %) (assoc % :rendered (render %)) %))
        (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.3
+
+### Added
+
+- Single pages now use same markdown-extensions as regular posts (so, all things like "@2x" should also work)
+
+## 0.4.2
+
+### Added
+
+- Ability to use @2x images in posts (image name should contain "@2x")
+
 ## 0.4.1
 
 ### Added

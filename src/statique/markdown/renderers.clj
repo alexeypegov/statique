@@ -133,8 +133,9 @@
              (.put attributes "loading" "lazy")
              (when (string/includes? (.getDestination node) "@2x")
                (let [destination (.getDestination node)]
-                 (.put attributes "src" (string/replace destination #"@2x" ""))
-                 (.put attributes "srcset" (str destination " 2x"))))))))
+                 (doto attributes
+                   (.put "src" (string/replace destination #"@2x" ""))
+                   (.put "srcset" (str destination " 2x")))))))))
 
 (defn- html-node-renderer-factory 
   [fetcher]
