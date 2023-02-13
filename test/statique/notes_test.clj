@@ -20,7 +20,7 @@
 
 (deftest item-changed?
   (let [item-changed? #'n/item-changed?]
-    (are [result source-crc-current target-crc-current item] (= result (item-changed? item source-crc-current target-crc-current))
+    (are [result source-crc-current target-crc-current item] (= result (item-changed? :nope item source-crc-current target-crc-current))
       true  1 nil {}
       true  2 nil {:source-crc 1}
       true  1 2   {:source-crc 1}
@@ -40,7 +40,7 @@
               :slug            "some_file"
               :link            "/some_file.html"
               :uuid            1}
-             (make-item-map (constantly nil) (io/file working-dir "notes/some_file.md"))))
+             (make-item-map (constantly nil) :nope (io/file working-dir "notes/some_file.md"))))
       (is (= {:source-file     (io/file working-dir "notes/some_unchanged.md")
               :source-relative "notes/some_unchanged.md"
               :target-file     (io/file working-dir "out/some_unchanged.html")
@@ -51,7 +51,7 @@
               :source-crc      777
               :target-crc      777
               :changed         false}
-             (make-item-map (constantly {:source-crc 777 :target-crc 777}) (io/file working-dir "notes/some_unchanged.md")))))))
+             (make-item-map (constantly {:source-crc 777 :target-crc 777}) :nope (io/file working-dir "notes/some_unchanged.md")))))))
 
 (deftest page-changed?
   (let [page-changed? #'n/page-changed?]
@@ -85,11 +85,10 @@
 (deftest feed-changed?
   (let [feed-changed? #'n/feed-changed?]
     (with-redefs [me.raynes.fs/exists? (fn [f] (= "exists.xml" f))]
-      (are [result target-crc-current target-file feed] (= result (feed-changed? feed target-file target-crc-current))
-        true  1 nil              {}
-        true  1 nil              {:target-crc 2}
-        true  1 "not-exists.xml" {:target-crc 1}
-        false 1 "exists.xml"     {:target-crc 1}))))
+      (are [result target-crc-current feed] (= result (feed-changed? feed target-crc-current))
+        true  1 {}
+        true  1 {:target-crc 2}
+        false 1 {:target-crc 1}))))
 
 (deftest make-feed
   (with-redefs [cfg/notes-cache (delay {:feeds {"rss" {:target-crc 666}}})]
@@ -103,10 +102,9 @@
              (make-feed "rss"))))))
 
 (deftest format-dates
-  (let [format-dates #'n/format-dates]
-    (is (= {:rfc-822  "Wed, 22 Apr 2020 00:00:00 +0300"
-            :rfc-3339 "2020-04-22T00:00:00+03:00"}
-           (format-dates "2020-04-22")))))
+  (let [prepare-dates #'n/prepare-dates]
+    (is (= {:created-at   "2020-04-22T00:00:00+03:00"}
+           (prepare-dates "2020-04-22" "Europe/Moscow")))))
 
 (deftest check-error
   (let [check-error #'n/check-error]

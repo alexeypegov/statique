@@ -47,8 +47,9 @@
 (defn- append-statique-vars
   [config]
   (->> (assoc (:vars config)
-              :statique      statique-string
-              :statique-link statique-link)
+              :statique        statique-string
+              :statique-link   statique-link
+              :datetime-format "yyyy-MM-dd'T'HH:mm:ssXXX")
        (assoc config :vars)))
 
 (defn- parse-config

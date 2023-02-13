@@ -5,8 +5,9 @@
             [java-time :as time]
             [pandect.algo.crc32 :as crc]
             [clojure.data :as d])
-  (:import [java.util Properties]
+  (:import [java.util Properties Date]
            [java.io FilenameFilter]
+           [java.time Instant]
            [java.time.format DateTimeFormatter]
            [java.io FilenameFilter]))
 
@@ -111,17 +112,13 @@
       m)))
 
 (defn parse-local-date
-  "Parses local date/time using given formatter"
+  "Parses local date as start of the day datetime using given format"
   [format tz date]
   {:pre [(string? format) (string? tz) (string? date)]}
   (let [local-date (time/local-date format date)]
-    (.atStartOfDay local-date (time/zone-id tz))))
+     (.atStartOfDay local-date (time/zone-id tz))))
 
-(defn rfc-822 
-  [datetime]
-  (.format DateTimeFormatter/RFC_1123_DATE_TIME datetime))
-
-(defn rfc-3339 
+(defn iso-offset
   [datetime]
   (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
 

@@ -101,14 +101,13 @@
               :changed         (feed-changed? cached target-crc)
               :target-crc      target-crc)))
 
-(defn- format-dates 
-  [date]
+(defn- prepare-dates 
+  [date tz]
   (when (some? date)
 		  (let [date-format (cfg/general :date-format)
-  		      tz          (cfg/general :tz)
-    		    parsed-date (u/parse-local-date date-format tz date)]
-      {:rfc-822  (u/rfc-822 parsed-date)
-     		:rfc-3339 (u/rfc-3339 parsed-date)})))
+          timezone (or tz (cfg/general :tz))
+    		    parsed-date (u/parse-local-date date-format timezone date)]
+      {:created-at (u/iso-offset parsed-date)})))
 
 (defmulti check-error :status)
 (defmethod check-error :ok [{:keys [result]}] result)
@@ -169,7 +168,7 @@
 
 (defn- make-note-cache 
   [result {:keys [source-relative] :as m}]
-  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :date :tags :rfc-822 :rfc-3339 :body :body-abs])))
+  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :created-at :tags :body :body-abs])))
 
 (defn- dump-note-cache
   [notes]
@@ -230,7 +229,7 @@
                  (-> (merge % (md/transform text :extensions @cfg/markdown-extensions))
                      (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs)))))
                %))
-       (map #(if (:changed %) (merge % (format-dates (:date %))) %))
+       (map #(if (:changed %) (merge % (prepare-dates (:date %) (:tz %))) %))
        (map report-draft-notes)
        (remove #(= "true" (:draft %)))
        (map #(if (:changed %) (assoc % :rendered (render %)) %))

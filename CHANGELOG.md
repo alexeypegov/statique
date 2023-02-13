@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+### Added
+
+### Changed
+
+- formatted date variables (`rfc_3339` and `rfc_882`) has been replaced with `created_at` of [ISO_OFFSET_DATE_TIME](https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html#ISO_OFFSET_DATE_TIME) format. New `vars.datetime_format` variable has been added for easily parsing `created_at` in FreeMarker
+
 ## 0.4.3
 
 ### Added
