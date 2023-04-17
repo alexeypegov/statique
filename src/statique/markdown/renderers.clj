@@ -2,6 +2,7 @@
   (:require [clojure.string :as string])
   (:import
     [java.util Map]
+    [java.io FileInputStream File FileNotFoundException]
     [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
     [org.commonmark.renderer NodeRenderer]
     [org.commonmark.renderer.html
@@ -125,17 +126,35 @@
          (proxy-super visitChildren node)
          (proxy-super visit node)))))
 
+(defn- get-1x-path
+  [base-dir image-path]
+  (let [path (.getPath (File. base-dir image-path))]
+    (if (string/includes? path "@2x")
+      (string/replace path #"@2x" "")
+      path)))
+
 (defn- image-attr-provider
-  []
+  [base-dir]
   (reify AttributeProvider
     (^void setAttributes [_ ^Node node ^String _ ^Map attributes]
            (when (instance? Image node)
-             (.put attributes "loading" "lazy")
-             (when (string/includes? (.getDestination node) "@2x")
-               (let [destination (.getDestination node)]
-                 (doto attributes
-                   (.put "src" (string/replace destination #"@2x" ""))
-                   (.put "srcset" (str destination " 2x")))))))))
+             (let [path (.getDestination node)]
+              (when-not (string/starts-with? path "http")
+                (.put attributes "loading" "lazy")
+                (let [path          (.getDestination node)
+                      path-for-size (get-1x-path base-dir path)]
+                   (try
+                     (with-open [r (FileInputStream. path-for-size)]
+                       (let [image (javax.imageio.ImageIO/read r)]
+                         (doto attributes
+                           (.put "width" (str (.getWidth image)))
+                           (.put "height" (str (.getHeight image))))))
+                    (catch FileNotFoundException e
+                      (println "\nError: fetching image size failed, file not found: " path "\n")))
+                 (when (string/includes? path "@2x")
+                   (doto attributes
+                     (.put "src" (string/replace path #"@2x" ""))
+                     (.put "srcset" (str path " 2x")))))))))))
 
 (defn- html-node-renderer-factory 
   [fetcher]
@@ -150,10 +169,10 @@
       (skip-parent-para-renderer context))))
 
 (defn- attr-provider-factory
-  []
+  [base-dir]
   (reify AttributeProviderFactory
     (^AttributeProvider create [_ ^AttributeProviderContext _]
-                        (image-attr-provider))))
+                        (image-attr-provider base-dir))))
 
 (defn- post-processor 
   [base-url]
@@ -165,8 +184,8 @@
       node)))
 
 (defn media-extension
-  ([noembed] (media-extension noembed nil))
-  ([noembed base-url]
+  ([noembed base-dir] (media-extension noembed base-dir nil))
+  ([noembed base-dir base-url]
    (reify
      Parser$ParserExtension
      (^void extend
@@ -177,4 +196,4 @@
        [_ ^HtmlRenderer$Builder rendererBuilder]
        (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed))
        #_(.nodeRendererFactory rendererBuilder (skip-parent-para-renderer-factory))
-       (.attributeProviderFactory rendererBuilder (attr-provider-factory))))))
+       (.attributeProviderFactory rendererBuilder (attr-provider-factory base-dir))))))

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.5
+
+### Changed
+
+- To improve post layouting, image files now rendered into "img" tags with "width" and "height" attributes being specified
+
 ## 0.4.4
 
 ### Added

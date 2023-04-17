@@ -294,7 +294,7 @@
 
 (defn generate-singles
   []
-  (let [dir 				(cfg/general :singles-dir)
-        files 		(u/list-files dir markdown-filter)
+  (let [dir     (cfg/general :singles-dir)
+        files   (u/list-files dir markdown-filter)
         singles (render-singles files)]
     (dump-singles-cache singles)))

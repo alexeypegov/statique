@@ -166,7 +166,7 @@
     		(u/file-cache @noembed-cache-file (fn [url] (noembed/fetch url))))))
 
 (def markdown-extensions
-  (delay (conj md/default-extensions (r/media-extension @noembed-cache))))
+  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :notes-dir)))))
 
 (def markdown-extensions-abs
-  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :base-url)))))
+  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :notes-dir) (general :base-url)))))
