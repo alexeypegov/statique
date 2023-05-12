@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+### Changed
+
+- Completely rewritten using more ideomatic Clojure and totally avoiding global state
+- Caches were reduced to one items.edn
+- Draft note property isn't supported anymore
+- Feed templates now rendered separately and `item.body` is passed in instead of `item.body_abs`
+- Project dependencies were updated to most recent ones
+
 ## 0.4.5
 
 ### Changed

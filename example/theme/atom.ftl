@@ -14,7 +14,7 @@
       <updated>${note.created_at}</updated>
       <content type="xhtml">
         <div xmlns="http://www.w3.org/1999/xhtml">
-        ${note.body_abs}
+        ${note.body}
         </div>
       </content>
       <author>

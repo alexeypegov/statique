@@ -3,10 +3,6 @@
             [clojure.string :as s]
             [me.raynes.fs :as fs]
             [statique.util :as u]
-            [statique.freemarker :as fm]
-            [statique.markdown.markdown :as md]
-            [statique.markdown.renderers :as r]
-            [statique.markdown.noembed :as noembed]
             [yaml.core :as yaml]))
 
 (def config-name                  "blog.yaml")
@@ -24,13 +20,14 @@
                                              :note-template    			"note"
                                              :page-template    			"page"
                                              :index-page-name  			"index"
+                                             :page-prefix           "page-"
                                              :single-template  			"single"
                                              :output-dir       			"./out/"
-                                             :notes-per-page  				10
+                                             :notes-per-page  			10
                                              :date-format      			"yyyy-MM-dd"
                                              :tz               			"Europe/Moscow" ; TODO: make it local
                                              :base-url         			"/"
-                                             :items-per-feed						10
+                                             :items-per-feed				10
                                              :feeds            			nil
                                              :copy             			nil}
                                    :vars    {}})
@@ -52,7 +49,7 @@
               :datetime-format "yyyy-MM-dd'T'HH:mm:ssXXX")
        (assoc config :vars)))
 
-(defn- parse-config
+(defn mk-config
   [working-dir]
   (-> (io/file working-dir config-name)
       (yaml/from-file convert-to-symbols)
@@ -61,112 +58,23 @@
       (append-statique-vars)
       (assoc-in [:general :root-dir] working-dir)))
 
-(defn- template-file 
-  [theme-dir template-name]
-  (fs/file theme-dir (format "%s.ftl" template-name)))
-
-(def ^:private config
-  (delay
-   (->> (u/working-dir)
-        (parse-config))))
-
-(defn general 
-  [& keys]
+(defn with-general
+  [cfg & keys]
   (->> (conj keys :general)
-       (get-in @config)))
+       (get-in cfg)))
 
-(defn- make-fm-config 
-  [theme-dir]
-  (let [note-template (template-file theme-dir (general :note-template))]
-    (if (fs/exists? note-template)
-      (fm/make-config theme-dir)
-      (u/exit -1 (format "Error: template '%s' was not found" note-template)))))
+(defn get-cache-file
+  [cfg name]
+  (let [dir       (with-general cfg :cache-dir)
+        filename  (format "%s.edn" name)]
+    (fs/file dir filename)))
 
-(defn- make-fm-renderer 
-  [theme-dir]
-  (some->> (u/validate-dir theme-dir)
-           (make-fm-config)
-           (partial fm/render)))
+(defn get-cache
+  [cfg name]
+  (u/read-edn (get-cache-file cfg name)))
 
-(def vars
-  (delay (:vars @config)))
-
-(defn cache-file 
-  [name]
-  (->> (format "%s.edn" name)
-       (fs/file (general :cache-dir))))
-
-(defn- skip-cache-prop-name
-  [cache-name]
-  (str "skip-" cache-name "-cache"))
-
-(defn skip-cache?
-  [cache-name]
-  (->> (skip-cache-prop-name cache-name)
-       (System/getProperty)
-       (Boolean/valueOf)
-       (boolean)))
-
-(defn read-cache 
-  [name]
-  (if (skip-cache? name)
-    		(do
-        (printf "Skipping %s cache...\n" name)
-        {})
-      (->> (cache-file name)
-       (u/read-edn))))
-
-(defn- get-cached-var
-  [name]
-  @@(ns-resolve 'statique.config (symbol (str name "-cache"))))
-
-(defn write-cache
-  [name data]
-  (let [file (cache-file name)
-          old  (get-cached-var name)]
-    		(when (not (u/maps-equal? old data))
-    				(printf "Writing %s cache...\n" name)
-        (u/write-file file data :data true))))
-
-(defn force-write-cache
-  [name data]
-  (let [file (cache-file name)]
-    (printf "Writing %s cache...\n" name)
-    (u/write-file file data :data true)))
-
-(def fm-renderer
-  (delay
-   (->> (general :theme-dir)
-        (make-fm-renderer))))
-
-(def notes-cache-name "notes")
-
-(def pages-cache-name "pages")
-
-(def feeds-cache-name "feeds")
-
-(def singles-cache-name "singles")
-
-(def noembed-cache-name "noembed")
-
-(def notes-cache (delay (read-cache notes-cache-name)))
-
-(def pages-cache (delay (read-cache pages-cache-name)))
-
-(def feeds-cache (delay (read-cache feeds-cache-name)))
-
-(def singles-cache (delay (read-cache singles-cache-name)))
-
-(def noembed-cache-file (delay (cache-file noembed-cache-name)))
-
-(def noembed-cache
-  (delay 
-    (if (skip-cache? noembed-cache-name)
-      {}
-    		(u/file-cache @noembed-cache-file (fn [url] (noembed/fetch url))))))
-
-(def markdown-extensions
-  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :notes-dir)))))
-
-(def markdown-extensions-abs
-  (delay (conj md/default-extensions (r/media-extension @noembed-cache (general :notes-dir) (general :base-url)))))
+(defn dump-cache
+  [cfg name data]
+  (let [file (get-cache-file cfg name)]
+    (u/write-file file data :data true)
+    (println "Cache written:" name)))

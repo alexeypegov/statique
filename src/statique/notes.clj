@@ -1,300 +1,271 @@
 (ns statique.notes
-  (:require [me.raynes.fs :as fs]
-            [statique.notes :as n]
+  (:require [statique.items :refer [item-seq]]
+            [statique.config :refer [with-general]]
             [statique.util :as u]
-            [statique.markdown.markdown :as md]
-            [statique.config :as cfg]
-            [clj-uuid :as uuid]
-            #_[clojure.tools.logging :as log :refer [log warn error info]]))
+            [me.raynes.fs :as fs]
+            [clj-uuid :as uuid]))
 
-(def ^:private html-ext         ".html")
-(def ^:private xml-ext          ".xml")
 (def ^:private markdown-filter  (u/postfix-filter ".md"))
+(def ^:private html-ext         ".html")
+(def ^:private md-ext           ".md")
+(def ^:private xml-ext          ".xml")
 
-(defmulti page-filename identity)
-(defmethod page-filename 1        [_] (str (cfg/general :index-page-name) html-ext))
-(defmethod page-filename :default [i] (str "page-" i html-ext))
+(defn- notes-dir [cfg] (with-general cfg :notes-dir))
+(defn- output-dir [cfg] (with-general cfg :output-dir))
 
-(defn- item-changed? 
-  [skip-key {:keys [source-crc target-crc]} source-crc-current target-crc-current]
-  (or
-   (not= source-crc source-crc-current)
-   (if-not (cfg/general skip-key)
-      (not= target-crc target-crc-current)
-      false)))
-
-(defn- make-item-map 
-  [cache-fn skip-key source-file]
-  (let [root-dir        (cfg/general :root-dir)
-        source-relative (u/relative-path root-dir source-file)
-        slug            (u/slug source-file)
-        target-filename (str slug html-ext)
-        output-dir      (cfg/general :output-dir)
-        target-file     (fs/file output-dir target-filename)
-        target-relative (u/relative-path root-dir target-file)
-        absolute-link   (str "/" slug html-ext)
-        target-crc      (u/crc32 target-file)
-        source-crc      (u/crc32 source-file)
-        cached          (cache-fn source-relative)]
-    (assoc cached
-           :source-file     source-file
-           :source-relative source-relative
-           :target-file     target-file
-           :target-relative target-relative
-           :slug            slug
-           :link            absolute-link
-           :uuid            (uuid/v3 uuid/+namespace-url+ absolute-link)
-           :changed         (item-changed? skip-key cached source-crc target-crc)
-           :source-crc      source-crc
-           :target-crc      target-crc)))
-
-(defn- page-changed? 
-  [{:keys [target-crc items-hash]} items target-crc-current items-hash-current]
-  (or
-		 			(not= items-hash items-hash-current)
-      (true? (some :changed items))
-      (if-not (cfg/general :skip-pages)
-        (not= target-crc target-crc-current)
-        false)))
-
-(defn- make-page 
-  [{:keys [index items next?]}]
-  (let [filename        (page-filename index)
-        root-dir        (cfg/general :root-dir)
-        output-dir      (cfg/general :output-dir)
-        target-file     (fs/file output-dir filename)
-        target-relative (u/relative-path root-dir target-file)
-        target-crc      (u/crc32 target-file)
-        items-hash      (hash (map :slug items))
-        cached          (get @cfg/pages-cache index {})]
-    (u/assoc? cached
-              :type            :page
-              :index           index
-              :next?           next?
-              :target-file     target-file
-              :target-relative target-relative
-              :changed         (page-changed? cached items target-crc items-hash)
-              :target-crc      target-crc
-              :items           items
-              :items-hash      items-hash)))
-
-(defn- feed-changed? 
-  [{:keys [target-crc]} target-crc-current]
-  (if-not (cfg/general :skip-feeds)
-    (not= target-crc target-crc-current)
-    false))
-
-(defn- make-feed 
-  [name]
-  (let [filename        (str name xml-ext)
-        root-dir        (cfg/general :root-dir)
-        output-dir      (cfg/general :output-dir)
-        target-file     (fs/file output-dir filename)
-        target-relative (u/relative-path root-dir target-file)
-        target-crc      (u/crc32 target-file)
-        cached          (get @cfg/feeds-cache name {})]
-    (u/assoc? cached
-              :type            :feed
-              :name            name
-              :target-relative target-relative
-              :target-file     target-file
-              :changed         (feed-changed? cached target-crc)
-              :target-crc      target-crc)))
-
-(defn- prepare-dates 
-  [date tz]
+(defn- format-date
+  [config date tz]
   (when (some? date)
-		  (let [date-format (cfg/general :date-format)
-          timezone (or tz (cfg/general :tz))
-    		    parsed-date (u/parse-local-date date-format timezone date)]
-      {:created-at (u/iso-offset parsed-date)})))
-
+    (let [date-format  (with-general config :date-format)
+          timezone     (or tz (with-general config :tz))
+          parsed-date  (u/parse-local-date date-format timezone date)]
+      (u/iso-offset parsed-date))))
+      
 (defmulti check-error :status)
 (defmethod check-error :ok [{:keys [result]}] result)
 (defmethod check-error :error [{:keys [message]}] (u/exit -1 message))
 
-(defn- render-to-file 
-  [template-name vars skip-key target-file]
-  (letfn [(write-file [data]                     
-            (when (not (cfg/general skip-key))
-              (u/write-file target-file data))
-            data)]
-    (println (format "Rendering \"%s\"..." (u/relative-path (cfg/general :root-dir) target-file)))
-    (->> (assoc vars :vars @cfg/vars)
-         (@cfg/fm-renderer template-name)
-         (check-error)
-         (write-file))))
+(defn- page-filename
+  [config index]
+  (let [index-name   (with-general config :index-page-name)
+        page-prefix  (with-general config :page-prefix)]
+    (if (= index 1)
+      (str index-name html-ext)
+      (str page-prefix index html-ext))))
 
-(defmulti ^:private render :type)
+(defn- items-changed?
+  [keys items]
+  (->> (select-keys items keys)
+       vals
+       (some #(:changed (second %)))
+       true?))
 
-(defmethod render :note 
-  [{:keys [target-file] :as m}]
-  (let [template (cfg/general :note-template)]
-    (render-to-file template m :skip-notes target-file)))
+(defn- render-item
+  [props config renderer template transformed]
+  (let [tpl  (with-general config template)
+        vars (:vars config)]
+    (->> (assoc props :vars vars)
+         (merge transformed)
+         (renderer tpl)
+         check-error)))
 
-(defmethod render :page 
-  [{:keys [target-file items index next?]}]
-  (let [template (cfg/general :page-template)]
-    (render-to-file template
-                    {:items     items
-                     :ndx       index
-                     :next?     next?
-                     :next-page (when next? (page-filename (inc index)))
-                     :prev-page (when (> index 1) (page-filename (dec index)))}
-                    :skip-pages
-                    target-file)))
+(defmulti render (fn [& args] (:type (first args))))
 
-(defmethod render :feed 
-  [{:keys [name items target-file]}]
-  (let [base-url (cfg/general :base-url)]
-    (render-to-file name 
-                    {:items items 
-                     :base-url base-url 
-                     :name name} 
-                    :skip-feeds 
-                    target-file)))
+(defmethod render :item [props config renderer transformed]
+  (render-item props config renderer :note-template transformed))
 
-(defmethod render :single 
-  [{:keys [target-file] :as m}]
-  (let [template (cfg/general :single-template)]
-    (render-to-file template 
-                    m 
-                    :skip-singles 
-                    target-file)))
+(defmethod render :page [props config renderer transformed]
+  (let [template  (with-general config :page-template)
+        vars      (:vars config)
+        index     (:index props)
+        next?     (:next? props)
+        next-page (when next? (page-filename config (inc index)))
+        prev-page (when (> index 1) (page-filename config (dec index)))]
+    (->> (assoc props
+                :ndx       index
+                :next-page next-page
+                :prev-page prev-page
+                :vars      vars
+                :items     transformed)
+         (renderer template)
+         check-error)))
 
-(defmethod render :default 
-  [m]
-  (throw (IllegalArgumentException. (format "I don't know how to render \"%s\"!" m))))
+(defmethod render :feed [{:keys [name] :as props} config renderer transformed]
+  (let [base-url (with-general config :base-url)
+        vars     (:vars config)]
+    (->> (assoc props
+                :items    transformed
+                :base-url base-url
+                :vars     vars)
+         (renderer name)
+         check-error)))
 
-(defn- make-note-cache 
-  [result {:keys [source-relative] :as m}]
-  (assoc result source-relative (select-keys m [:rendered :source-crc :target-crc :title :created-at :tags :body :body-abs])))
+(defmethod render :single [props config renderer transformed]
+  (render-item props config renderer :single-template transformed))
 
-(defn- dump-note-cache
-  [notes]
-  (->> (reduce make-note-cache {} notes)
-       (cfg/write-cache cfg/notes-cache-name)))
+(defn item-transform
+  [transformer config type source-file slug]
+  (let [transformed  (transformer type (slurp source-file))
+        date         (:date transformed)
+        tz           (:tz transformed)
+        created-at   (format-date config date tz)
+        link         (str "/" slug html-ext)
+        uuid         (uuid/v3 uuid/+namespace-url+ link)]
+    (assoc transformed
+           :created-at created-at
+           :slug       slug
+           :link       link
+           :uuid       uuid)))
 
-(defn- make-page-cache
-  [result {:keys [index] :as page}]
-  (assoc result index (select-keys page [:items-hash :target-crc :rendered])))
+(defprotocol Handler
+  (id [this])
+  (changed? [this])
+  (populate [this])
+  (transform [this transformer]))
 
-(defn- dump-page-cache
-  [pages]
-  (when (seq pages)
-    (->> (reduce make-page-cache {} pages)
-         (cfg/write-cache cfg/pages-cache-name))))
+(deftype ItemHandler [config slug source-file target-file source-crc target-crc cached]
+  Handler
+  (id [_] slug)
+  (changed? [_]
+    (or
+      (not= source-crc (:source-crc cached))
+      (not= target-crc (:target-crc cached))))
+  (populate [_]
+    {:source-crc  source-crc
+     :target-file target-file})
+  (transform [_ transformer]
+    (item-transform transformer config :relative source-file slug)))
+  
+(deftype PageHandler [config index slugs items target-file items-hash target-crc cached]
+  Handler
+  (id [_] index)
+  (changed? [_]
+    (or 
+      (not= target-crc (:target-crc cached))
+      (not= items-hash (:items-hash cached))
+      (items-changed? slugs items)))
+  (populate [_]
+    {:items-hash  items-hash
+     :target-file target-file})
+  (transform [_ _]
+    (map #(:transformed (get items %)) slugs)))
 
-(defn- make-feed-cache 
-  [result {:keys [name] :as feed}]
-  (assoc result name (select-keys feed [:target-crc :rendered])))
+(deftype FeedHandler [config name slugs items target-file items-hash target-crc cached]
+  Handler
+  (id [_] name)
+  (changed? [_]
+    (or
+     (not= target-crc (:target-crc cached))
+     (not= items-hash (:items-hash cached))
+     (items-changed? slugs items)))
+  (populate [_]
+    {:items-hash  items-hash
+     :target-file target-file})
+  (transform [_ transformer]
+    (let [transform (partial item-transform transformer config :absolute)]
+      (letfn [(tr [slug]
+                (let [notes-dir   (notes-dir config)
+                      filename    (str slug md-ext)
+                      source-file (fs/file notes-dir filename)]
+                  (transform source-file slug)))]
+        (map tr slugs)))))
 
-(defn- dump-feed-cache
-  [feeds]
-  (when (seq feeds)
-    (->> (reduce make-feed-cache {} feeds)
-         (cfg/write-cache cfg/feeds-cache-name))))
+(defmulti mk-handler (fn [item & _] (:type item)))
 
-(defn- dump-noembed-cache 
-  []
-  (let [data (@cfg/noembed-cache :all)]
-    (when-not (empty? data)
-      (cfg/force-write-cache cfg/noembed-cache-name data))))
+(defmethod mk-handler :item [item {:keys [config items]}]
+  (let [notes-dir   (notes-dir config)
+        output-dir  (output-dir config)
+        slug        (:slug item)
+        target-file (fs/file output-dir (str slug html-ext))
+        source-file (fs/file notes-dir (str slug md-ext))
+        source-crc  (u/crc32 source-file)
+        target-crc  (u/crc32 target-file)
+        cached      (get items slug {})]
+    (->ItemHandler config slug source-file target-file source-crc target-crc cached)))
 
-(defn- make-note 
-  [file]
-  ; todo: extract cached fn to upper level
-  (letfn [(cached [key] (get @cfg/notes-cache key {}))]
-    (-> (make-item-map cached :skip-notes file)
-        (assoc :type :note))))
+(defmethod mk-handler :page [page {:keys [config items]}]
+  (let [index       (:index page)
+        slugs       (:items page)
+        output-dir  (output-dir config)
+        filename    (page-filename config index)
+        target-file (fs/file output-dir filename)
+        target-crc  (u/crc32 target-file)
+        items-hash  (hash slugs)
+        cached      (get items index {})]
+    (->PageHandler config index slugs items target-file items-hash target-crc cached)))
 
-(defn- target-crc 
-  [{:keys [target-file]}]
-  (if (fs/exists? target-file)
-    (u/crc32 target-file)
-    0))
+(defmethod mk-handler :feed [feed {:keys [config items]}]
+  (let [name        (:name feed)
+        slugs       (:slugs feed)
+        filename    (str name xml-ext)
+        output-dir  (output-dir config)
+        target-file (fs/file output-dir filename)
+        target-crc  (u/crc32 target-file)
+        items-hash  (hash slugs)
+        cached      (get items name {})]
+    (->FeedHandler config name slugs items target-file items-hash target-crc cached)))
+    
+(defmethod mk-handler :single [item {:keys [config items]}]
+  (let [singles-dir (with-general config :singles-dir)
+        output-dir  (output-dir config)
+        slug (:slug item)
+        source-file (fs/file singles-dir (str slug md-ext))
+        target-file (fs/file output-dir (str slug html-ext))
+        source-crc  (u/crc32 source-file)
+        target-crc  (u/crc32 target-file)
+        cached      (get items slug {})]
+    (->ItemHandler config slug source-file target-file source-crc target-crc cached)))
 
-(defn- report-draft-notes
-  [{:keys [draft slug] :as note}]
-  (when (= "true" draft)
-    (printf "Draft skipped: %s\n" slug))
-  note)
+(defn- process-item [reporter transformer renderer {:keys [config items] :as ctx} item]
+  (let [handler   (mk-handler item ctx)
+        changed?  (changed? handler)]
+    (if changed?
+      (do
+        (reporter {:render (:type item)} (id handler))
+        (let [transformed    (transform handler transformer)
+              rendered       (render item config renderer transformed)
+              new-target-crc (u/crc32 rendered)]
+          (as-> (populate handler) $
+            (assoc $ :target-crc new-target-crc)
+            (assoc $ :changed? changed?)
+            (assoc $ :rendered rendered)
+            (assoc items (id handler) $)
+            (assoc ctx :items $))))
+      ctx)))
 
-(defn- render-notes 
-  [files]
-  (->> (map make-note files)
-       (u/prev-next #(assoc %1 :prev (:slug %3) :next (:slug %2)))
-       (map #(if (:changed %)
-               (let [text (slurp (:source-file %))]
-                 (-> (merge % (md/transform text :extensions @cfg/markdown-extensions))
-                     (assoc :body-abs (:body (md/transform text :extensions @cfg/markdown-extensions-abs)))))
-               %))
-       (map #(if (:changed %) (merge % (prepare-dates (:date %) (:tz %))) %))
-       (map report-draft-notes)
-       (remove #(= "true" (:draft %)))
-       (map #(if (:changed %) (assoc % :rendered (render %)) %))
-       (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
+(defmulti process (fn [& args] (:type (last args))))
 
-(defn- render-feeds 
-  [items]
-  (let [changed (true? (some :changed items))]
-    (->> (cfg/general :feeds)
-       		(map make-feed)
-       		(map #(if (or changed (:changed %)) (assoc % :rendered (render (assoc % :items items))) %))
-       		(map #(if (or changed (:changed %)) (assoc % :target-crc (target-crc %)) %)))))
+(defmethod process :item [& args]
+  (apply process-item args))
 
-(defn- render-pages 
-  [pages]
-  (->> (map make-page pages)
-       (map #(if (:changed %) (assoc % :rendered (render %)) %))
-       (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
+(defmethod process :page [& args]
+  (apply process-item args))
 
-(defn- render-pages-if-enabled
-  [notes]
-  (let [npp (cfg/general :notes-per-page)]
-    (when (> npp 0)
-      (->> (u/paged-seq npp notes)
-           (render-pages)))))
+(defmethod process :feed [reporter transformer renderer {:keys [config] :as context} {slugs :items}]
+  (let [feeds (with-general config :feeds)
+        proc  (partial process-item reporter transformer renderer)]
+    (->> (map #(assoc {}
+                      :type :feed
+                      :name %
+                      :slugs slugs)
+              feeds)
+         (reduce proc context))))
 
-(defn generate-notes-and-pages
-  []
-  (when-let [notes-dir (u/validate-dir (cfg/general :notes-dir))]
-    (let [files (reverse (u/sorted-files notes-dir markdown-filter))
-          notes (render-notes files)
-          pages (render-pages-if-enabled notes)
-          ipf   (cfg/general :items-per-feed)
-          feeds (render-feeds (take ipf notes))]
-      (dump-note-cache notes)
-      (dump-feed-cache feeds)
-      (dump-page-cache pages)
-      (dump-noembed-cache))))
+(defmethod process :single [& args]
+  (apply process-item args))
 
-(defn- make-single 
-  [file]
-  (letfn [(cached [key] (get @cfg/singles-cache key {}))]
-    (assoc (make-item-map cached :skip-singles file)
-           :type :single)))
+(defn- prev-next
+  [coll]
+  (u/prev-next
+   #(= :item (:type %))
+   #(assoc %1
+           :prev (:slug %3)
+           :next (:slug %2))
+   coll))
 
-(defn- render-singles 
-  [files]
-  (->> (map make-single files)
-       (map #(if (:changed %) (merge % (md/transform-file (:source-file %) :extensions @cfg/markdown-extensions)) %))
-       (map #(if (:changed %) (assoc % :rendered (render %)) %))
-       (map #(if (:changed %) (assoc % :target-crc (target-crc %)) %))))
-
-(defn- make-singles-cache 
-  [result {:keys [source-relative] :as single}]
-  (assoc result source-relative (select-keys single [:rendered :source-crc :target-crc])))
-
-(defn- dump-singles-cache
-  [singles]
-  (when (seq singles)
-		  (->> (reduce make-singles-cache {} singles)
-		       (cfg/write-cache cfg/singles-cache-name))))
+(defn generate-notes
+  [reporter config items-cache transformer renderer]
+  (when-let [notes-dir (u/validate-dir (with-general config :notes-dir))]
+    (let [page-size    (with-general config :notes-per-page)
+          feed-size    (with-general config :items-per-feed)
+          files        (reverse (u/sorted-files notes-dir markdown-filter))
+          slugs        (map u/slug files)
+          proc         (partial process reporter transformer renderer)
+          context      {:config config
+                        :items  items-cache}]
+     (->> (item-seq page-size feed-size slugs)
+          prev-next
+          (reduce proc context)
+          :items))))
 
 (defn generate-singles
-  []
-  (let [dir     (cfg/general :singles-dir)
-        files   (u/list-files dir markdown-filter)
-        singles (render-singles files)]
-    (dump-singles-cache singles)))
+  [reporter config items-cache transformer renderer]
+  (let [singles-dir (with-general config :singles-dir)
+        files (u/list-files singles-dir markdown-filter)
+        slugs (map u/slug files)
+        proc (partial process reporter transformer renderer)
+        context {:config config
+                 :items  items-cache}]
+    (->> (item-seq :single slugs)
+         (reduce proc context)
+         :items)))

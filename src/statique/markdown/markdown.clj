@@ -4,14 +4,15 @@
            [org.commonmark.renderer.html HtmlRenderer]
            [org.commonmark.ext.gfm.strikethrough StrikethroughExtension]
            [org.commonmark.ext.front.matter YamlFrontMatterExtension]
-           [org.commonmark.ext.front.matter YamlFrontMatterVisitor]))
+           [org.commonmark.ext.front.matter YamlFrontMatterVisitor]
+           [java.io File]))
 
 (def ^:private array-values ["Tags"])
 
 (defonce default-extensions
-   [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
+  [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
 
-(defn- string->node 
+(defn- string->node
   [text extensions]
   (-> (doto (Parser/builder) (.extensions extensions))
       (.build)
@@ -27,7 +28,7 @@
   [m]
   (into {} (for [[k v] m] [(keyword (s/lower-case k)) (if (some #{k} array-values) v (first v))])))
 
-(defn- get-meta
+(defn- get-metadata
   [node]
   (let [meta-visitor (YamlFrontMatterVisitor.)]
     (.accept node meta-visitor)
@@ -35,12 +36,14 @@
         (.getData)
         (map-meta-values))))
 
-(defn transform 
-  [text & {:keys [extensions] :or {extensions default-extensions}}]
-  (let [node (string->node text extensions)]
-    (assoc (get-meta node) :body (node->html node extensions))))
+(defmulti transform (fn [v & _] (type v)))
 
-(defn transform-file 
-  [file & {:keys [extensions] :or {extensions default-extensions}}]
-  (-> (slurp file)
+(defmethod transform File
+  [f & {:keys [extensions] :or {extensions default-extensions}}]
+  (-> (slurp f)
       (transform :extensions extensions)))
+
+(defmethod transform String
+  [t & {:keys [extensions] :or {extensions default-extensions}}]
+  (let [node (string->node t extensions)]
+    (assoc (get-metadata node) :body (node->html node extensions))))

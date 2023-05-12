@@ -1,21 +1,24 @@
 (ns statique.util
   (:require [clojure.java.io :as io]
-            [clojure.string :as s]
+            [clojure.string :as str]
             [me.raynes.fs :as fs]
             [java-time :as time]
             [pandect.algo.crc32 :as crc]
             [clojure.data :as d])
-  (:import [java.util Properties Date]
+  (:import [java.util Properties]
            [java.io FilenameFilter]
-           [java.time Instant]
            [java.time.format DateTimeFormatter]
            [java.io FilenameFilter]))
 
-(defn working-dir 
+(defmacro dbg
+  [x] 
+  `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
+
+(defn working-dir
   []
   (io/file (System/getProperty "user.dir")))
 
-(defn get-version 
+(defn get-version
   [dep]
   (let [path  (str "META-INF/maven/" (or (namespace dep) (name dep)) "/" (name dep) "/pom.properties")]
     (when-let [props (io/resource path)]
@@ -24,7 +27,7 @@
             (.getProperty "version"))))))
 
 (defn exit
-  "Exits returing a given status and (optionally) prints some message"
+  "Exits returing a given status and (optionally) prints some message(s)"
   [status & s]
   (when (seq s)
     (apply println s))
@@ -47,13 +50,7 @@
   "Creates a postfix filename filter for File::listFiles"
   [^String postfix]
   (reify FilenameFilter
-    (accept [_ _ name] (s/ends-with? name postfix))))
-
-(defn relative-path 
-  [root file]
-  (-> (.toPath root)
-      (.relativize (.toPath file))
-      (.toString)))
+    (accept [_ _ name] (str/ends-with? name postfix))))
 
 (defn read-edn
   "Reads EDN from the given file, returns default object if empty or no file"
@@ -67,75 +64,58 @@
 (defn validate-dir
   "Checks whatever given file is directory and it is exist"
   [dir]
-  (when-not (and (fs/directory? dir) (fs/exists? dir))
+  (when-not (and
+             (fs/directory? dir)
+             (fs/exists? dir))
     (exit -1 (format "Error: directory was not found (%s)" dir)))
   dir)
 
-(defn paged-seq
-  ([page-size col]
-   (paged-seq page-size col 1))
-  ([page-size col index]
-   {:pre [(number? page-size) (seq? col)]}
+(defn prev-next
+  "Lazily iterates over collection applying (fn cur, prev, next) to each element (matching predicate) of a collection"
+  ([cb col]
+   (prev-next any? cb nil col))
+  ([pred cb col]
+   (prev-next pred cb nil col))
+  ([pred cb prev col]
    (lazy-seq
     (when (not-empty col)
-      (let [items (take page-size col)
-            rest  (drop page-size col)]
-        (cons
-         {:index index
-          :items items
-          :next? (boolean (seq rest))}
-         (paged-seq page-size rest (inc index))))))))
-
-(defn prev-next
-  "Lazily iterates over collection applying (fn cur, prev, next) to each element of a collection"
-  ([cb col]
-   (prev-next cb nil col))
-  ([cb prev col]
-   (lazy-seq 
-    (when (not-empty col)
-      (let [n 			(first col)
-            next (second col)]
-        (cons 
-          (cb n prev next)
-          (prev-next cb n (rest col))))))))
-
-(defn assoc?
-  "Associates all non-empty values"
-  [m & pairs]
-  {:pre (even? (count pairs))}
-  (as-> pairs $
-    (partition 2 $)
-    (filter #(some? (second %)) $)
-    (apply concat $)
-    (if (seq $)
-      (apply assoc m $)
-      m)))
+      (let [s     (first col)
+            rest  (rest col)]
+        (if (pred s)
+          (let [next (some #(when (pred %) %) rest)]
+            (cons
+             (cb s prev next)
+             (prev-next pred cb s rest)))
+          (cons
+           s
+           (prev-next pred cb prev rest))))))))
 
 (defn parse-local-date
   "Parses local date as start of the day datetime using given format"
   [format tz date]
   {:pre [(string? format) (string? tz) (string? date)]}
   (let [local-date (time/local-date format date)]
-     (.atStartOfDay local-date (time/zone-id tz))))
+    (.atStartOfDay local-date (time/zone-id tz))))
 
 (defn iso-offset
   [datetime]
   (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
 
-(defn slug 
+(defn slug
   [file]
-  (s/lower-case (fs/base-name file true)))
+  (str/lower-case (fs/base-name file true)))
 
-(defn crc32 
-  [file]
-  (when (fs/exists? file) (crc/crc32 file)))
+(defmulti crc32 type)
+(defmethod crc32 java.io.File [file]
+  "Returns CRC32 checksum for the given file or 0 if file does not exist"
+  (try
+    (crc/crc32 file)
+    (catch java.io.FileNotFoundException _
+      0)))
+(defmethod crc32 String [s]
+  (crc/crc32 s))
 
-(defn maps-equal?
-  [a b]
-  (let [[a1 b1] (d/diff a b)]
-    (and (empty? a1) (empty? b1))))
-
-(defn write-file 
+(defn write-file
   [path ^String content & {:keys [data] :or {data false}}]
   (let [file (io/file path)]
     (fs/mkdirs (fs/parent file))

@@ -8,8 +8,7 @@
 (defn fetch 
   "Fetches noembed data for the given media URL"
   [url]
-  (let [options              {:query-params {:url url
-                                             :timeout 1000}}
+  (let [options              {:query-params {:url url :timeout 1000}}
         {:keys [body error]} @(http/get noembed-url options)]
     (if-not error
       (try
@@ -17,8 +16,8 @@
         (catch Throwable e
           (log/warn url (.getMessage e))
           {:error (.getMessage e) 
-           :url url}))
+           :url   url}))
       (do 
         (log/warn url)
         {:error url
-         :url url}))))
+         :url   url}))))

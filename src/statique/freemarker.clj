@@ -1,10 +1,10 @@
 (ns statique.freemarker
-  (:require [clojure.walk :as walk])
+  (:require [clojure.walk :refer [postwalk]])
   (:import [freemarker.template Configuration DefaultObjectWrapper TemplateExceptionHandler]
            [java.io StringWriter]))
 
-(def ^:private template-extension      "ftl")
-(def ^:private def-encoding            "UTF-8")
+(def ^:private template-extension "ftl")
+(def ^:private def-encoding       "UTF-8")
 
 (defn make-config
   ([template-dir] (make-config template-dir def-encoding))
@@ -23,12 +23,12 @@
                     (if (keyword? k)
                       [(.replace (name k) "-" "_") v]
                       [k v]))]
-    (walk/postwalk #(if (map? %)
+    (postwalk #(if (map? %)
                  (into {} (map stringify %))
                  %)
               m)))
 
-(defn render 
+(defn render
   [^Configuration cfg template-name params]
   (let [filename (format "%s.%s" template-name template-extension)
         model    (replace-hyphens params)]
