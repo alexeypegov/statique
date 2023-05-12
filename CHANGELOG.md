@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+### Fixed
+
+- Page rendering bug
+
 ## 0.5.0
 
 ### Changed

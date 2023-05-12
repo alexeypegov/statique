@@ -49,40 +49,6 @@
          (renderer tpl)
          check-error)))
 
-(defmulti render (fn [& args] (:type (first args))))
-
-(defmethod render :item [props config renderer transformed]
-  (render-item props config renderer :note-template transformed))
-
-(defmethod render :page [props config renderer transformed]
-  (let [template  (with-general config :page-template)
-        vars      (:vars config)
-        index     (:index props)
-        next?     (:next? props)
-        next-page (when next? (page-filename config (inc index)))
-        prev-page (when (> index 1) (page-filename config (dec index)))]
-    (->> (assoc props
-                :ndx       index
-                :next-page next-page
-                :prev-page prev-page
-                :vars      vars
-                :items     transformed)
-         (renderer template)
-         check-error)))
-
-(defmethod render :feed [{:keys [name] :as props} config renderer transformed]
-  (let [base-url (with-general config :base-url)
-        vars     (:vars config)]
-    (->> (assoc props
-                :items    transformed
-                :base-url base-url
-                :vars     vars)
-         (renderer name)
-         check-error)))
-
-(defmethod render :single [props config renderer transformed]
-  (render-item props config renderer :single-template transformed))
-
 (defn item-transform
   [transformer config type source-file slug]
   (let [transformed  (transformer type (slurp source-file))
@@ -100,35 +66,54 @@
 (defprotocol Handler
   (id [this])
   (changed? [this])
-  (populate [this])
-  (transform [this transformer]))
+  (populate [this transformed])
+  (transform [this transformer])
+  (render [this props renderer transformed]))
 
-(deftype ItemHandler [config slug source-file target-file source-crc target-crc cached]
+(deftype ItemHandler [config slug template source-file target-file source-crc target-crc cached]
   Handler
   (id [_] slug)
   (changed? [_]
     (or
-      (not= source-crc (:source-crc cached))
-      (not= target-crc (:target-crc cached))))
-  (populate [_]
+     (not= source-crc (:source-crc cached))
+     (not= target-crc (:target-crc cached))))
+  (populate [_ transformed]
     {:source-crc  source-crc
-     :target-file target-file})
+     :target-file target-file
+     :transformed transformed})
   (transform [_ transformer]
-    (item-transform transformer config :relative source-file slug)))
+    (item-transform transformer config :relative source-file slug))
+  (render [_ props renderer transformed]
+    (render-item props config renderer template transformed)))
   
 (deftype PageHandler [config index slugs items target-file items-hash target-crc cached]
   Handler
   (id [_] index)
   (changed? [_]
-    (or 
-      (not= target-crc (:target-crc cached))
-      (not= items-hash (:items-hash cached))
-      (items-changed? slugs items)))
-  (populate [_]
+    (or
+     (not= target-crc (:target-crc cached))
+     (not= items-hash (:items-hash cached))
+     (items-changed? slugs items)))
+  (populate [_ _]
     {:items-hash  items-hash
      :target-file target-file})
   (transform [_ _]
-    (map #(:transformed (get items %)) slugs)))
+    (map #(:transformed (get items %)) slugs))
+  (render [_ props renderer transformed]
+    (let [template  (with-general config :page-template)
+          vars      (:vars config)
+          index     (:index props)
+          next?     (:next? props)
+          next-page (when next? (page-filename config (inc index)))
+          prev-page (when (> index 1) (page-filename config (dec index)))]
+      (->> (assoc props
+                  :ndx       index
+                  :next-page next-page
+                  :prev-page prev-page
+                  :vars      vars
+                  :items     transformed)
+           (renderer template)
+           check-error))))
 
 (deftype FeedHandler [config name slugs items target-file items-hash target-crc cached]
   Handler
@@ -138,7 +123,7 @@
      (not= target-crc (:target-crc cached))
      (not= items-hash (:items-hash cached))
      (items-changed? slugs items)))
-  (populate [_]
+  (populate [_ _]
     {:items-hash  items-hash
      :target-file target-file})
   (transform [_ transformer]
@@ -148,7 +133,16 @@
                       filename    (str slug md-ext)
                       source-file (fs/file notes-dir filename)]
                   (transform source-file slug)))]
-        (map tr slugs)))))
+        (map tr slugs))))
+  (render [_ props renderer transformed]
+    (let [base-url (with-general config :base-url)
+          vars     (:vars config)]
+      (->> (assoc props
+                  :items    transformed
+                  :base-url base-url
+                  :vars     vars)
+           (renderer name)
+           check-error))))
 
 (defmulti mk-handler (fn [item & _] (:type item)))
 
@@ -161,7 +155,7 @@
         source-crc  (u/crc32 source-file)
         target-crc  (u/crc32 target-file)
         cached      (get items slug {})]
-    (->ItemHandler config slug source-file target-file source-crc target-crc cached)))
+    (->ItemHandler config slug :note-template source-file target-file source-crc target-crc cached)))
 
 (defmethod mk-handler :page [page {:keys [config items]}]
   (let [index       (:index page)
@@ -194,7 +188,7 @@
         source-crc  (u/crc32 source-file)
         target-crc  (u/crc32 target-file)
         cached      (get items slug {})]
-    (->ItemHandler config slug source-file target-file source-crc target-crc cached)))
+    (->ItemHandler config slug :single-template source-file target-file source-crc target-crc cached)))
 
 (defn- process-item [reporter transformer renderer {:keys [config items] :as ctx} item]
   (let [handler   (mk-handler item ctx)
@@ -203,9 +197,9 @@
       (do
         (reporter {:render (:type item)} (id handler))
         (let [transformed    (transform handler transformer)
-              rendered       (render item config renderer transformed)
+              rendered       (render handler item renderer transformed)
               new-target-crc (u/crc32 rendered)]
-          (as-> (populate handler) $
+          (as-> (populate handler transformed) $
             (assoc $ :target-crc new-target-crc)
             (assoc $ :changed? changed?)
             (assoc $ :rendered rendered)
