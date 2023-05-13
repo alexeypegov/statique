@@ -1,4 +1,4 @@
-(defproject statique "0.5.1"
+(defproject statique "0.5.2"
   :description "Statique — static blog generator"
   :url "https://github.com/alexeypegov/statique"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
@@ -17,9 +17,7 @@
                  [pandect "1.0.2"]
                  [clojure.java-time "1.2.0"]
                  [danlentz/clj-uuid "0.1.9"]
-                 [clojure.java-time "1.2.0"]
-                 [com.twelvemonkeys.imageio/imageio-webp "3.9.4"]
-                 [com.twelvemonkeys.imageio/imageio-jpeg "3.9.4"]]
+                 [clojure.java-time "1.2.0"]]
   :plugins [[lein-eftest "0.5.9"]
             [lein-ancient "1.0.0-RC3"]]
   :repl-options {:init-ns statique.core}

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+### Changed
+
+- Performance: got rid of `javax.imageio` in favor of own image dimension reader (`statique.image`)
+
 ## 0.5.1
 
 ### Fixed

@@ -190,7 +190,7 @@
         cached      (get items slug {})]
     (->ItemHandler config slug :single-template source-file target-file source-crc target-crc cached)))
 
-(defn- process-item [reporter transformer renderer {:keys [config items] :as ctx} item]
+(defn- process-item [reporter transformer renderer {:keys [items] :as ctx} item]
   (let [handler   (mk-handler item ctx)
         changed?  (changed? handler)]
     (if changed?

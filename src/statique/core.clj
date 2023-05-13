@@ -7,7 +7,8 @@
             [statique.markdown.markdown :as md]
             [statique.markdown.renderers :as r]
             [statique.config :as cfg]
-            [statique.static :as s])
+            [statique.static :as s]
+            [statique.image :as img])
   (:gen-class))
 
 (def ^:private working-dir (u/working-dir))

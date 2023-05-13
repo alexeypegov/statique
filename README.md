@@ -6,6 +6,7 @@ Static site/blog generator written in Clojure
 
 - Posts and standalone pages in [Markdown][1] with [YAML metadata][2]
 - [Freemarker][3] templates for rendering posts, standalone pages and feeds ([RSS][4], [Atom][5])
+- Support for retina-enabled images (with `@2x` postfix)
 - Embedding Youtube and Vimeo videos using [noembed][6]
 - Incremental rendering of changed posts/pages
 
@@ -17,7 +18,7 @@ Static site/blog generator written in Clojure
 
 ## Version
 
-0.5.1
+0.5.2
 
 ## Examples
 

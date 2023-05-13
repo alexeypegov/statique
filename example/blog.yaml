@@ -50,7 +50,6 @@ general:
   # List of static files and directories to copy, directories are copied recursively, default is none
   copy:
     - static/robots.txt
-    - static/CNAME
     - notes/images
 
 # Custom variables that are passed as "vars" object into all templates

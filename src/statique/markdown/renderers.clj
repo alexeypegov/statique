@@ -1,20 +1,21 @@
 (ns statique.markdown.renderers
-  (:require [clojure.string :as s])
+  (:require [clojure.string :as s]
+            [statique.image :as i])
   (:import
-    [java.util Map]
-    [java.io FileInputStream File FileNotFoundException]
-    [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
-    [org.commonmark.renderer NodeRenderer]
-    [org.commonmark.renderer.html
-     HtmlRenderer$HtmlRendererExtension
-     HtmlRenderer$Builder
-     HtmlNodeRendererFactory
-     HtmlNodeRendererContext
-     AttributeProviderFactory
-     AttributeProviderContext
-     AttributeProvider]
-    [org.commonmark.node Node Link Text Image AbstractVisitor]
-    [statique.markdown.media MediaNode]))
+   [java.util Map]
+   [java.io File FileNotFoundException]
+   [org.commonmark.parser Parser$ParserExtension Parser$Builder PostProcessor]
+   [org.commonmark.renderer NodeRenderer]
+   [org.commonmark.renderer.html
+    HtmlRenderer$HtmlRendererExtension
+    HtmlRenderer$Builder
+    HtmlNodeRendererFactory
+    HtmlNodeRendererContext
+    AttributeProviderFactory
+    AttributeProviderContext
+    AttributeProvider]
+   [org.commonmark.node Node Link Text Image AbstractVisitor]
+   [statique.markdown.media MediaNode]))
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "coub.com"])
 
@@ -137,24 +138,23 @@
   [base-dir]
   (reify AttributeProvider
     (^void setAttributes [_ ^Node node ^String _ ^Map attributes]
-           (when (instance? Image node)
-             (let [path (.getDestination node)]
-              (when-not (s/starts-with? path "http")
-                (.put attributes "loading" "lazy")
-                (let [path          (.getDestination node)
-                      path-for-size (get-1x-path base-dir path)]
-                   (try
-                     (with-open [r (FileInputStream. path-for-size)]
-                       (let [image (javax.imageio.ImageIO/read r)]
-                         (doto attributes
-                           (.put "width" (str (.getWidth image)))
-                           (.put "height" (str (.getHeight image))))))
-                    (catch FileNotFoundException _
-                      (println "\nError: fetching image size failed, file not found: " path "\n")))
-                 (when (s/includes? path "@2x")
-                   (doto attributes
-                     (.put "src" (s/replace path #"@2x" ""))
-                     (.put "srcset" (str path " 2x")))))))))))
+      (when (instance? Image node)
+        (let [path (.getDestination node)]
+          (when-not (s/starts-with? path "http")
+            (.put attributes "loading" "lazy")
+            (let [path          (.getDestination node)
+                  path-for-size (get-1x-path base-dir path)]
+              (try
+                (let [[width height] (i/get-dimensions path-for-size)]
+                  (doto attributes
+                    (.put "width" (str width))
+                    (.put "height" (str height))))
+                (catch FileNotFoundException _
+                  (println "\nError: unable to determine image size, file not found: " path "\n")))
+              (when (s/includes? path "@2x")
+                (doto attributes
+                  (.put "src" (s/replace path #"@2x" ""))
+                  (.put "srcset" (str path " 2x")))))))))))
 
 (defn- html-node-renderer-factory
   [fetcher]
