@@ -4,25 +4,25 @@ Static site/blog generator written in Clojure
 
 ## Features
 
-- Posts and standalone pages in [Markdown][1] with [YAML metadata][2]
-- [Freemarker][3] templates for rendering posts, standalone pages and feeds ([RSS][4], [Atom][5])
+- Posts and standalone pages in [Markdown][md] with [YAML metadata][yaml]
+- [Freemarker][3] templates for rendering posts, standalone pages and feeds ([RSS][rss], [Atom][atom])
 - Support for retina-enabled images (with `@2x` postfix)
-- Embedding Youtube and Vimeo videos using [noembed][6]
+- Embedding Youtube and Vimeo videos using [noembed][noembed]
 - Incremental rendering of changed posts/pages
+- sitemap.xml support
 
 ## Not [yet] supported
 
 - Tags
 - Static files incremental copy
-- Sitemap
 
 ## Version
 
-0.5.2
+0.5.3
 
 ## Examples
 
-See `example` directory.
+See `example` directory or [my own blog][own]
 
 ## Usage
 
@@ -39,9 +39,10 @@ Copyright © 2018-2023 Alexey Pegov
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
  
-[1]: https://daringfireball.net/projects/markdown/syntax 
-[2]: https://assemble.io/docs/YAML-front-matter.html
-[3]: https://freemarker.apache.org/
-[4]: https://www.rssboard.org/rss-specification
-[5]: https://validator.w3.org/feed/docs/atom.html
-[6]: https://noembed.com
+[md]: https://daringfireball.net/projects/markdown/syntax 
+[yaml]: https://assemble.io/docs/YAML-front-matter.html
+[fm]: https://freemarker.apache.org/
+[rss]: https://www.rssboard.org/rss-specification
+[atom]: https://validator.w3.org/feed/docs/atom.html
+[noembed]: https://noembed.com
+[own]: https://github.com/alexeypegov.com/pegov.io

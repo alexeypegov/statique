@@ -13,18 +13,18 @@
 (defn- notes-dir [cfg] (with-general cfg :notes-dir))
 (defn- output-dir [cfg] (with-general cfg :output-dir))
 
-(defn- format-date
+(defn- parse-date
   [config date tz]
   (when (some? date)
-    (let [date-format  (with-general config :date-format)
-          timezone     (or tz (with-general config :tz))
-          parsed-date  (u/parse-local-date date-format timezone date)]
-      (u/iso-offset parsed-date))))
-      
-(defmulti check-error :status)
-(defmethod check-error :ok [{:keys [result]}] result)
-(defmethod check-error :error [{:keys [message]}] (u/exit -1 message))
+    (let [date-format (with-general config :date-format)
+          timezone    (or tz (with-general config :tz))]
+      (u/parse-local-date date-format timezone date))))
 
+(defn- format-date
+  [config date tz]
+  (when-let [parsed-date (parse-date config date tz)]
+    (u/iso-offset parsed-date)))
+      
 (defn- page-filename
   [config index]
   (let [index-name   (with-general config :index-page-name)
@@ -47,7 +47,7 @@
     (->> (assoc props :vars vars)
          (merge transformed)
          (renderer tpl)
-         check-error)))
+         u/check-render-error)))
 
 (defn item-transform
   [transformer config type source-file slug]
@@ -113,7 +113,7 @@
                   :vars      vars
                   :items     transformed)
            (renderer template)
-           check-error))))
+           u/check-render-error))))
 
 (deftype FeedHandler [config name slugs items target-file items-hash target-crc cached]
   Handler
@@ -142,7 +142,7 @@
                   :base-url base-url
                   :vars     vars)
            (renderer name)
-           check-error))))
+           u/check-render-error))))
 
 (defmulti mk-handler (fn [item & _] (:type item)))
 
@@ -191,11 +191,12 @@
     (->ItemHandler config slug :single-template source-file target-file source-crc target-crc cached)))
 
 (defn- process-item [reporter transformer renderer {:keys [items] :as ctx} item]
-  (let [handler   (mk-handler item ctx)
+  (let [type      (:type item)
+        handler   (mk-handler item ctx)
         changed?  (changed? handler)]
     (if changed?
       (do
-        (reporter {:render (:type item)} (id handler))
+        (reporter [:render type] (id handler))
         (let [transformed    (transform handler transformer)
               rendered       (render handler item renderer transformed)
               new-target-crc (u/crc32 rendered)]
@@ -203,6 +204,7 @@
             (assoc $ :target-crc new-target-crc)
             (assoc $ :changed? changed?)
             (assoc $ :rendered rendered)
+            (assoc $ :type type)
             (assoc items (id handler) $)
             (assoc ctx :items $))))
       ctx)))
@@ -263,3 +265,20 @@
     (->> (item-seq :single slugs)
          (reduce proc context)
          :items)))
+
+(defmulti sitemap-item (fn [_ props] (:type props)))
+(defmethod sitemap-item :page [_ _] nil)
+(defmethod sitemap-item :feed [_ _] nil)
+(defmethod sitemap-item :default [config props]
+  (let [base-url    (with-general config :base-url)
+        transformed (:transformed props)
+        slug        (:slug transformed)
+        loc         (str base-url slug html-ext)
+        date        (:date transformed)
+        updated     (:updated transformed)
+        tz          (:tz transformed)
+        datetime    (parse-date config (or date updated) tz)
+        lastmod     (u/iso-local-date datetime)]
+  {:loc     loc
+   :lastmod lastmod}))
+  

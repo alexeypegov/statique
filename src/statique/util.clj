@@ -101,6 +101,10 @@
   [datetime]
   (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
 
+(defn iso-local-date
+  [datetime]
+  (.format DateTimeFormatter/ISO_LOCAL_DATE datetime))
+
 (defn slug
   [file]
   (str/lower-case (fs/base-name file true)))
@@ -139,3 +143,7 @@
           (when-let [new (new-fn key)]
             (swap! m assoc key new)
             new))))))
+
+(defmulti check-render-error :status)
+(defmethod check-render-error :ok [{:keys [result]}] result)
+(defmethod check-render-error :error [{:keys [message]}] (exit -1 message))

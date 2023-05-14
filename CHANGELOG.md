@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+### Added
+
+- Sitemap generation, see `examples`
+
 ## 0.5.2
 
 ### Changed

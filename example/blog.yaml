@@ -28,6 +28,9 @@ general:
   # Name of Freemarker template used for render pages, default is "page"
   page-template: page
 
+  # Name of the sitemap template, not set by default (disabled)
+  sitemap-template: sitemap
+
   # Name of the index page (i.e. index.html), default is "index"
   index-page-name: index
 

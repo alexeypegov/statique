@@ -7,12 +7,8 @@
 
 (def config-name                  "blog.yaml")
 (def app-version                  (u/get-version 'statique))
-
 (def ^:private convert-to-symbols true)
-
-(def ^:private statique-string    (format "Statique %s" app-version))
-(def ^:private statique-link      (format "<a href=\"https://github.com/alexeypegov/statique\">%s</a>" statique-string))
-
+(def ^:private statique           "<a href=\"https://github.com/alexeypegov/statique\">Statique</a>")
 (def ^:private default-config     {:general {:notes-dir        			"notes/"
                                              :theme-dir        			"theme/"
                                              :singles-dir      			"singles/"
@@ -22,6 +18,7 @@
                                              :index-page-name  			"index"
                                              :page-prefix           "page-"
                                              :single-template  			"single"
+                                             :sitemap-template      nil
                                              :output-dir       			"./out/"
                                              :notes-per-page  			10
                                              :date-format      			"yyyy-MM-dd"
@@ -44,8 +41,7 @@
 (defn- append-statique-vars
   [config]
   (->> (assoc (:vars config)
-              :statique        statique-string
-              :statique-link   statique-link
+              :statique        statique
               :datetime-format "yyyy-MM-dd'T'HH:mm:ssXXX")
        (assoc config :vars)))
 
