@@ -37,12 +37,6 @@ general:
   # Name of template used to render single pages, default is "single"
   single-template: single
 
-  # Format of the date used in note files in Date meta, default is "yyyy-MM-dd"
-  date-format: yyyy-MM-dd
-
-  # Timezone name, used for feed dates, default is "Europe/Moscow"
-  tz: Europe/Moscow
-
   # Base URL used for feeds generation
   base-url: https://staticblog.com/
 

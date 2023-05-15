@@ -5,14 +5,14 @@
 <#assign slug=(note.slug)!slug>
 <#assign tags=(note.tags)!tags>
 <#assign body=(note.body)!body>
-<#assign created_at=((note.created_at)!created_at)>
+<#assign date=(note.date)!date>
 
-<#assign datetime=created_at?datetime(vars.datetime_format)>
+<#assign parsed_date=date?date("yyyy-MM-dd")>
 
 <article>
   <h1><a href="${slug}.html">${title}</a></h1>
   <div class="sub">
-    <time class="date" datetime="${created_at}">${datetime?date}</time>
+    <time class="date" datetime="${parsed_date?string["yyyy-MM-dd'T00:00:00+00:00'"]}">${parsed_date?date}</time>
     <#-- <div class="tags"> -->
     <#-- <#list tags as tag> -->
       <#-- <span class="tag">${tag}</span> -->

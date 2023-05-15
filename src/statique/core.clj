@@ -80,6 +80,7 @@
     (let [sitemap-item (partial n/sitemap-item config)
           output-dir   (cfg/with-general config :output-dir)
           target-file  (fs/file output-dir "sitemap.xml")]
+      (println "Writing sitemap.xml")
       (->> {:items (filter some? (map sitemap-item (vals items)))}
            (renderer template)
            u/check-render-error

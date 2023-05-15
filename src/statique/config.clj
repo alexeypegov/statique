@@ -21,13 +21,13 @@
                                              :sitemap-template      nil
                                              :output-dir       			"./out/"
                                              :notes-per-page  			10
-                                             :date-format      			"yyyy-MM-dd"
-                                             :tz               			"Europe/Moscow" ; TODO: make it local
                                              :base-url         			"/"
                                              :items-per-feed				10
                                              :feeds            			nil
                                              :copy             			nil}
                                    :vars    {}})
+
+
 
 (defn- with-defaults
   [config]
@@ -41,8 +41,7 @@
 (defn- append-statique-vars
   [config]
   (->> (assoc (:vars config)
-              :statique        statique
-              :datetime-format "yyyy-MM-dd'T'HH:mm:ssXXX")
+              :statique statique)
        (assoc config :vars)))
 
 (defn mk-config

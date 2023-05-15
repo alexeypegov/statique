@@ -13,18 +13,6 @@
 (defn- notes-dir [cfg] (with-general cfg :notes-dir))
 (defn- output-dir [cfg] (with-general cfg :output-dir))
 
-(defn- parse-date
-  [config date tz]
-  (when (some? date)
-    (let [date-format (with-general config :date-format)
-          timezone    (or tz (with-general config :tz))]
-      (u/parse-local-date date-format timezone date))))
-
-(defn- format-date
-  [config date tz]
-  (when-let [parsed-date (parse-date config date tz)]
-    (u/iso-offset parsed-date)))
-      
 (defn- page-filename
   [config index]
   (let [index-name   (with-general config :index-page-name)
@@ -37,7 +25,7 @@
   [keys items]
   (->> (select-keys items keys)
        vals
-       (some #(:changed (second %)))
+       (some :changed?)
        true?))
 
 (defn- render-item
@@ -50,18 +38,15 @@
          u/check-render-error)))
 
 (defn item-transform
-  [transformer config type source-file slug]
-  (let [transformed  (transformer type (slurp source-file))
-        date         (:date transformed)
-        tz           (:tz transformed)
-        created-at   (format-date config date tz)
-        link         (str "/" slug html-ext)
-        uuid         (uuid/v3 uuid/+namespace-url+ link)]
+  [transformer type source-file slug]
+  (let [text        (slurp source-file)
+        transformed (transformer type text)
+        link        (str "/" slug html-ext)
+        uuid        (uuid/v3 uuid/+namespace-url+ link)]
     (assoc transformed
-           :created-at created-at
-           :slug       slug
-           :link       link
-           :uuid       uuid)))
+           :slug slug
+           :link link
+           :uuid uuid)))
 
 (defprotocol Handler
   (id [this])
@@ -82,7 +67,7 @@
      :target-file target-file
      :transformed transformed})
   (transform [_ transformer]
-    (item-transform transformer config :relative source-file slug))
+    (item-transform transformer :relative source-file slug))
   (render [_ props renderer transformed]
     (render-item props config renderer template transformed)))
   
@@ -127,7 +112,7 @@
     {:items-hash  items-hash
      :target-file target-file})
   (transform [_ transformer]
-    (let [transform (partial item-transform transformer config :absolute)]
+    (let [transform (partial item-transform transformer :absolute)]
       (letfn [(tr [slug]
                 (let [notes-dir   (notes-dir config)
                       filename    (str slug md-ext)
@@ -270,15 +255,8 @@
 (defmethod sitemap-item :page [_ _] nil)
 (defmethod sitemap-item :feed [_ _] nil)
 (defmethod sitemap-item :default [config props]
-  (let [base-url    (with-general config :base-url)
-        transformed (:transformed props)
-        slug        (:slug transformed)
-        loc         (str base-url slug html-ext)
-        date        (:date transformed)
-        updated     (:updated transformed)
-        tz          (:tz transformed)
-        datetime    (parse-date config (or date updated) tz)
-        lastmod     (u/iso-local-date datetime)]
-  {:loc     loc
-   :lastmod lastmod}))
+  (let [base-url     (with-general config :base-url)
+        transformed  (:transformed props)]
+    (assoc transformed
+           :loc (str base-url (:slug transformed) html-ext))))
   

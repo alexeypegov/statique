@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4
+
+### Removed
+
+- 'created_at' is not passed as an item property to Freemarker templates, all metadata fields are passed as is.
+- 'tz' & 'date-format' config properties were removed as well
+
+### Fixed
+
+- A bug preventing feed/page to be rerendered in a case if one of its items has been changed
+- A bug that ignores 'Updated' metadata field if 'Date' field was declared for the item while building sitemap.xml 
+
 ## 0.5.3
 
 ### Added

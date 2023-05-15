@@ -2,14 +2,11 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [me.raynes.fs :as fs]
-            [java-time :as time]
-            [pandect.algo.crc32 :as crc]
-            [clojure.data :as d])
+            [pandect.algo.crc32 :as crc])
   (:import [java.util Properties]
-           [java.io FilenameFilter]
-           [java.time.format DateTimeFormatter]
            [java.io FilenameFilter]))
 
+#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defmacro dbg
   [x] 
   `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
@@ -34,7 +31,6 @@
   (System/exit status))
 
 (defn list-files
-  ; ([] (list-files nil))
   ([dir name-filter] (.listFiles dir name-filter))
   ([dir name-filter comparator]
    (->> (list-files dir name-filter)
@@ -89,21 +85,6 @@
           (cons
            s
            (prev-next pred cb prev rest))))))))
-
-(defn parse-local-date
-  "Parses local date as start of the day datetime using given format"
-  [format tz date]
-  {:pre [(string? format) (string? tz) (string? date)]}
-  (let [local-date (time/local-date format date)]
-    (.atStartOfDay local-date (time/zone-id tz))))
-
-(defn iso-offset
-  [datetime]
-  (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME datetime))
-
-(defn iso-local-date
-  [datetime]
-  (.format DateTimeFormatter/ISO_LOCAL_DATE datetime))
 
 (defn slug
   [file]

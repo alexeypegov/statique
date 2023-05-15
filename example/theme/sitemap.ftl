@@ -9,7 +9,7 @@
 <#list items as item>
   <url>
     <loc>${item.loc}</loc>
-    <lastmod>${item.lastmod}</lastmod>
+    <lastmod>${(item.updated)!(item.date)}</lastmod>
   </url>
 </#list>
 </urlset>
