@@ -28,11 +28,19 @@
        (some :changed?)
        true?))
 
+(defn- substitute-real-slug
+  "Substitutes fake index slug with real slug, for an index item in a case if pages are not generated"
+  [props]
+  (if-let [real-slug (:real-slug props)]
+    (assoc props :slug real-slug)
+    props))
+
 (defn- render-item
   [props config renderer template transformed]
   (let [tpl  (with-general config template)
         vars (:vars config)]
     (->> (assoc props :vars vars)
+          substitute-real-slug
          (merge transformed)
          (renderer tpl)
          u/check-render-error)))
@@ -135,8 +143,9 @@
   (let [notes-dir   (notes-dir config)
         output-dir  (output-dir config)
         slug        (:slug item)
+        real-slug   (or (:real-slug item) slug)
         target-file (fs/file output-dir (str slug html-ext))
-        source-file (fs/file notes-dir (str slug md-ext))
+        source-file (fs/file notes-dir (str real-slug md-ext))
         source-crc  (u/crc32 source-file)
         target-crc  (u/crc32 target-file)
         cached      (get items slug {})]
@@ -218,7 +227,7 @@
 (defn- prev-next
   [coll]
   (u/prev-next
-   #(= :item (:type %))
+   #(and (= :item (:type %)) (= nil (:real-slug %)))
    #(assoc %1
            :prev (:slug %3)
            :next (:slug %2))

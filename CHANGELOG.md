@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.5
+
+### Changed
+
+- New "index" item (with contents of first item) is generated in a case if `notes-per-page` is set to 0
+
+### Fixed
+
+- Empty caches are not written anymore
+- Feed renderer will use 1x images in a case if 2x is available
+
 ## 0.5.4
 
 ### Removed

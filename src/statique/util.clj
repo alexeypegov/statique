@@ -70,21 +70,21 @@
   "Lazily iterates over collection applying (fn cur, prev, next) to each element (matching predicate) of a collection"
   ([cb col]
    (prev-next any? cb nil col))
-  ([pred cb col]
-   (prev-next pred cb nil col))
-  ([pred cb prev col]
+  ([next-pred cb col]
+   (prev-next next-pred cb nil col))
+  ([next-pred cb prev col]
    (lazy-seq
     (when (not-empty col)
-      (let [s     (first col)
-            rest  (rest col)]
-        (if (pred s)
-          (let [next (some #(when (pred %) %) rest)]
+      (let [fst  (first col)
+            rest (rest col)]
+        (if (next-pred fst)
+          (let [next (some #(when (next-pred %) %) rest)]
             (cons
-             (cb s prev next)
-             (prev-next pred cb s rest)))
+             (cb fst prev next)
+             (prev-next next-pred cb fst rest)))
           (cons
-           s
-           (prev-next pred cb prev rest))))))))
+           fst
+           (prev-next next-pred cb prev rest))))))))
 
 (defn slug
   [file]

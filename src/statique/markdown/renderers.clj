@@ -65,7 +65,8 @@
   (proxy [AbstractVisitor] []
     (visit [node]
       (if (instance? Image node)
-        (.setDestination node (format "%s%s" base-url (.getDestination node)))
+        (let [path (.getDestination node)]
+          (.setDestination node (format "%s%s" base-url (s/replace path #"@2x" ""))))
         (proxy-super visitChildren node)))))
 
 (defmulti ^:private typed-media (fn [{:keys [error type]} _] (if error
@@ -117,23 +118,6 @@
       (^void render [_ ^Node node]
         (write-media-html node writer noembed)))))
 
-; disabled
-#_(defn- skip-parent-para-renderer 
-  [context]
-  (proxy [CoreHtmlNodeRenderer] [^HtmlNodeRendererContext context]
-     (getNodeTypes [] #{Paragraph})
-     (^void render [^Node node]
-       (if (instance? Document (.getParent node))
-         (proxy-super visitChildren node)
-         (proxy-super visit node)))))
-
-(defn- get-1x-path
-  [base-dir image-path]
-  (let [path (.getPath (File. base-dir image-path))]
-    (if (s/includes? path "@2x")
-      (s/replace path #"@2x" "")
-      path)))
-
 (defn- image-attr-provider
   [base-dir]
   (reify AttributeProvider
@@ -143,7 +127,8 @@
           (when-not (s/starts-with? path "http")
             (.put attributes "loading" "lazy")
             (let [path          (.getDestination node)
-                  path-for-size (get-1x-path base-dir path)]
+                  path-1x       (s/replace path #"@2x" "")
+                  path-for-size (.getPath (File. base-dir path-1x))]
               (try
                 (let [[width height] (i/get-dimensions path-for-size)]
                   (doto attributes
@@ -161,12 +146,6 @@
   (reify HtmlNodeRendererFactory
     (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
       (media-node-renderer context fetcher))))
-
-#_(defn- skip-parent-para-renderer-factory 
-  []
-  (reify HtmlNodeRendererFactory
-    (^NodeRenderer create [_ ^HtmlNodeRendererContext context]
-      (skip-parent-para-renderer context))))
 
 (defn- attr-provider-factory
   [base-dir]
@@ -195,5 +174,4 @@
      (^void extend
        [_ ^HtmlRenderer$Builder rendererBuilder]
        (.nodeRendererFactory rendererBuilder (html-node-renderer-factory noembed))
-       #_(.nodeRendererFactory rendererBuilder (skip-parent-para-renderer-factory))
        (.attributeProviderFactory rendererBuilder (attr-provider-factory base-dir))))))

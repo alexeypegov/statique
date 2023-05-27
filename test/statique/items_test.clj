@@ -29,7 +29,8 @@
            {:slug 4, :type :item}
            {:slug 5, :type :item}
            {:index 2, :items [3 4 5], :type :page, :next? false}) (i/item-seq 3 3 (range 6))))
-  (is (= '({:slug 0, :type :item}
+  (is (= '({:real-slug 0, :slug "index", :type :item}
+           {:slug 0, :type :item}
            {:slug 1, :type :item}
            {:slug 2, :type :item}) (i/item-seq 0 0 (range 3)))))
 

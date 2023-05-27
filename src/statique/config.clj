@@ -70,6 +70,7 @@
 
 (defn dump-cache
   [cfg name data]
-  (let [file (get-cache-file cfg name)]
-    (u/write-file file data :data true)
-    (println "Cache written:" name)))
+  (when (seq data)
+    (let [file (get-cache-file cfg name)]
+      (u/write-file file data :data true)
+      (println "Cache written:" name))))
