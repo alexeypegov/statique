@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.56
+
+### Changed
+
+- Switched to x.x versioning scheme
+- `next`/`prev` for individual notes are cycled now
+
 ## 0.5.5
 
 ### Changed

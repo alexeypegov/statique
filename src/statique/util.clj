@@ -67,24 +67,24 @@
   dir)
 
 (defn prev-next
-  "Lazily iterates over collection applying (fn cur, prev, next) to each element (matching predicate) of a collection"
-  ([cb col]
-   (prev-next any? cb nil col))
-  ([next-pred cb col]
-   (prev-next next-pred cb nil col))
-  ([next-pred cb prev col]
+  "Lazily iterates over collection applying (fn cur, prev, next) to each element"
+  ([cb col] (prev-next any? cb col))
+  ([pred cb col] (prev-next pred cb nil col col))
+  ([pred cb prev col rest-col]
    (lazy-seq
-    (when (not-empty col)
-      (let [fst  (first col)
-            rest (rest col)]
-        (if (next-pred fst)
-          (let [next (some #(when (next-pred %) %) rest)]
-            (cons
-             (cb fst prev next)
-             (prev-next next-pred cb fst rest)))
+    (when (not-empty rest-col)
+      (let [cur  (first rest-col)
+            rest (rest rest-col)]
+        (if (pred cur)
+          (letfn [(pred-fn [col] (some #(when (pred %) %) col))]
+            (let [prev' (or prev (pred-fn (reverse col)))
+                  next (or (pred-fn rest) (pred-fn col))]
+              (cons
+               (cb cur prev' next)
+               (prev-next pred cb cur col rest))))
           (cons
-           fst
-           (prev-next next-pred cb prev rest))))))))
+           cur
+           (prev-next pred cb prev col rest))))))))
 
 (defn slug
   [file]
