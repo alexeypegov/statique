@@ -60,6 +60,26 @@
       (println "Items written:" count)
       items)))
 
+(defn- recent-item
+  [items]
+  (->> (vals items)
+       (filter #(= :item (:type %)))
+       (sort #(compare (:slug %2) (:slug %1)))
+       first))
+
+(defn- copy-index
+  [config items]
+  (when (cfg/with-general config :copy-last-as-index)
+    (let [last-item (recent-item items)]
+      (when (:changed? last-item)
+        (let [slug       (get-in last-item [:transformed :slug])
+              last-file  (:target-file last-item)
+              index-file (io/file (.getParentFile last-file) "index.html")
+              data       (:rendered last-item)]
+          (u/write-file index-file data)
+          (println "Writing note" slug "as index.html")))))
+  items)
+
 (defn- prepare-cache
   [r [k v]]
   (assoc r k (dissoc v :rendered :target-file :changed?)))
@@ -104,11 +124,12 @@
   []
   (printf "Statique %s\n\n" cfg/app-version)
   (if (blog-dir? working-dir)
-    (let [config  (cfg/mk-config working-dir)
-          noembed (mk-noembed-cache config)
+    (let [config   (cfg/mk-config working-dir)
+          noembed  (mk-noembed-cache config)
           renderer (mk-renderer config)]
       (some->> (render0 reporter config renderer noembed)
                write-changed
+               (copy-index config)
                (generate-sitemap config renderer)
                (reduce prepare-cache {})
                (write-caches config noembed))

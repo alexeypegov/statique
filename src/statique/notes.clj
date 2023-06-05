@@ -28,19 +28,11 @@
        (some :changed?)
        true?))
 
-(defn- substitute-real-slug
-  "Substitutes fake index slug with real slug, for an index item in a case if pages are not generated"
-  [props]
-  (if-let [real-slug (:real-slug props)]
-    (assoc props :slug real-slug)
-    props))
-
 (defn- render-item
   [props config renderer template transformed]
   (let [tpl  (with-general config template)
         vars (:vars config)]
     (->> (assoc props :vars vars)
-          substitute-real-slug
          (merge transformed)
          (renderer tpl)
          u/check-render-error)))
@@ -227,7 +219,7 @@
 (defn- prev-next
   [coll]
   (u/prev-next
-   #(and (= :item (:type %)) (= nil (:real-slug %)))
+   #(= :item (:type %))
    #(assoc %1
            :prev (:slug %3)
            :next (:slug %2))

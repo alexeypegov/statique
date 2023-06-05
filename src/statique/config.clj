@@ -18,6 +18,7 @@
                                              :index-page-name  			"index"
                                              :page-prefix           "page-"
                                              :single-template  			"single"
+                                             :copy-last-as-index    false
                                              :sitemap-template      nil
                                              :output-dir       			"./out/"
                                              :notes-per-page  			10

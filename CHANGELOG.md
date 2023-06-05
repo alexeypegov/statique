@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57
+
+### Added
+
+- General configuration option `copy-last-as-index` (default is `false`) to copy last rendered note as `index.html` in a case if `notes-per-page` is set to 0. 
+
 ## 0.56
 
 ### Changed
