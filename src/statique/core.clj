@@ -64,7 +64,7 @@
   [items]
   (->> (vals items)
        (filter #(= :item (:type %)))
-       (sort #(compare (:slug %2) (:slug %1)))
+       (sort #(compare (get-in %2 [:transformed :slug]) (get-in %1 [:transformed :slug])))
        first))
 
 (defn- copy-index

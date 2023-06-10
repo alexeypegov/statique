@@ -218,12 +218,16 @@
 
 (defn- prev-next
   [coll]
-  (u/prev-next
-   #(= :item (:type %))
-   #(assoc %1
-           :prev (:slug %3)
-           :next (:slug %2))
-   coll))
+  (let [cnt   (count (filter #(= :item (:type %)) coll))
+        index (atom (+ 1 cnt))]
+    (u/prev-next
+     #(= :item (:type %))
+     #(assoc %1
+             :count cnt
+             :index (swap! index dec)
+             :prev  (:slug %3)
+             :next  (:slug %2))
+     coll)))
 
 (defn generate-notes
   [reporter config items-cache transformer renderer]

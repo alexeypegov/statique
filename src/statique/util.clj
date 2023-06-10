@@ -78,7 +78,7 @@
         (if (pred cur)
           (letfn [(pred-fn [col] (some #(when (pred %) %) col))]
             (let [prev' (or prev (pred-fn (reverse col)))
-                  next (or (pred-fn rest) (pred-fn col))]
+                  next  (or (pred-fn rest) (pred-fn col))]
               (cons
                (cb cur prev' next)
                (prev-next pred cb cur col rest))))

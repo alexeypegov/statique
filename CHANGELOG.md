@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.58
+
+### Added
+
+- `count` and `index` variable for individual notes
+
+### Fixed
+
+- `copy-last-as-index` was not calculating most recent note properly
+
 ## 0.57
 
 ### Added
