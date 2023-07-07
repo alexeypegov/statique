@@ -230,7 +230,7 @@
      coll)))
 
 (defn generate-notes
-  [reporter config items-cache transformer renderer]
+  [reporter config transformer renderer items-cache]
   (when-let [notes-dir (u/validate-dir (with-general config :notes-dir))]
     (let [page-size    (with-general config :notes-per-page)
           feed-size    (with-general config :items-per-feed)
@@ -245,7 +245,7 @@
           :items))))
 
 (defn generate-singles
-  [reporter config items-cache transformer renderer]
+  [reporter config transformer renderer items-cache]
   (let [singles-dir (with-general config :singles-dir)
         files (u/list-files singles-dir markdown-filter)
         slugs (map u/slug files)

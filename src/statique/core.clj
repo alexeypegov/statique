@@ -33,7 +33,7 @@
 (defn- mk-noembed-cache
   [config]
   (let [file (cfg/get-cache-file config "noembed")]
-    (u/file-cache file #(noembed/fetch %))))
+    (u/file-cache file noembed/fetch)))
 
 (defn- mk-renderer 
   [config]
@@ -60,17 +60,19 @@
       (println "Items written:" count)
       items)))
 
-(defn- recent-item
+(defn- most-recent-item
   [items]
   (->> (vals items)
        (filter #(= :item (:type %)))
-       (sort #(compare (get-in %2 [:transformed :slug]) (get-in %1 [:transformed :slug])))
+       (sort #(compare
+               (get-in %2 [:transformed :slug])
+               (get-in %1 [:transformed :slug])))
        first))
 
 (defn- copy-index
   [config items]
   (when (cfg/with-general config :copy-last-as-index)
-    (let [last-item (recent-item items)]
+    (let [last-item (most-recent-item items)]
       (when (:changed? last-item)
         (let [slug       (get-in last-item [:transformed :slug])
               last-file  (:target-file last-item)
@@ -111,9 +113,8 @@
   [reporter config renderer noembed]
   (let [item-cache  (cfg/get-cache config "items")
         transformer (partial transformer config noembed)]
-    (as-> item-cache $
-      (n/generate-notes reporter config $ transformer renderer)
-      (n/generate-singles reporter config $ transformer renderer))))
+    (->> (n/generate-notes reporter config transformer renderer item-cache)
+         (n/generate-singles reporter config transformer renderer))))
 
 (defn- write-caches
   [config noembed items]
