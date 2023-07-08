@@ -55,17 +55,20 @@
   (transform [this transformer])
   (render [this props renderer transformed]))
 
-(deftype ItemHandler [config slug template source-file target-file source-crc target-crc cached]
+(deftype ItemHandler [config slug count template source-file target-file source-crc target-crc cached]
   Handler
   (id [_] slug)
   (changed? [_]
     (or
-     (not= source-crc (:source-crc cached))
-     (not= target-crc (:target-crc cached))))
+     (not= source-crc   (:source-crc cached))
+     (not= target-crc   (:target-crc cached))
+     (not= count        (:count cached))))
   (populate [_ transformed]
-    {:source-crc  source-crc
+    (u/?assoc {}
+     :source-crc  source-crc
      :target-file target-file
-     :transformed transformed})
+     :transformed transformed
+     :count       count))
   (transform [_ transformer]
     (item-transform transformer :relative source-file slug))
   (render [_ props renderer transformed]
@@ -135,13 +138,14 @@
   (let [notes-dir   (notes-dir config)
         output-dir  (output-dir config)
         slug        (:slug item)
+        count       (:count item)
         real-slug   (or (:real-slug item) slug)
         target-file (fs/file output-dir (str slug html-ext))
         source-file (fs/file notes-dir (str real-slug md-ext))
         source-crc  (u/crc32 source-file)
         target-crc  (u/crc32 target-file)
         cached      (get items slug {})]
-    (->ItemHandler config slug :note-template source-file target-file source-crc target-crc cached)))
+    (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc cached)))
 
 (defmethod mk-handler :page [page {:keys [config items]}]
   (let [index       (:index page)
@@ -168,13 +172,13 @@
 (defmethod mk-handler :single [item {:keys [config items]}]
   (let [singles-dir (with-general config :singles-dir)
         output-dir  (output-dir config)
-        slug (:slug item)
+        slug        (:slug item)
         source-file (fs/file singles-dir (str slug md-ext))
         target-file (fs/file output-dir (str slug html-ext))
         source-crc  (u/crc32 source-file)
         target-crc  (u/crc32 target-file)
         cached      (get items slug {})]
-    (->ItemHandler config slug :single-template source-file target-file source-crc target-crc cached)))
+    (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc cached)))
 
 (defn- process-item [reporter transformer renderer {:keys [items] :as ctx} item]
   (let [type      (:type item)
@@ -217,13 +221,14 @@
   (apply process-item args))
 
 (defn- prev-next
-  [coll]
+  [add-cnt coll]
   (let [cnt   (count (filter #(= :item (:type %)) coll))
-        index (atom (+ 1 cnt))]
+        index (atom (+ 1 cnt))
+        _cnt  (if add-cnt cnt nil)]
     (u/prev-next
      #(= :item (:type %))
      #(assoc %1
-             :count cnt
+             :count _cnt ; count is added for pageless renders only since it might cause notes to be rerendered
              :index (swap! index dec)
              :prev  (:slug %3)
              :next  (:slug %2))
@@ -238,9 +243,10 @@
           slugs        (map u/slug files)
           proc         (partial process reporter transformer renderer)
           context      {:config config
-                        :items  items-cache}]
+                        :items  items-cache}
+          pageless     (= page-size 0)]
      (->> (item-seq page-size feed-size slugs)
-          prev-next
+          (prev-next pageless)
           (reduce proc context)
           :items))))
 

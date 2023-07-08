@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.59
+
+### Fixed
+
+- Notes should be properly rerendered when adding a note for pageless blogs (i.e. when `notes-per-page = 0`)
+
+### Changed
+
+- `count` variable now won't be available if pages are enabled (i.e `notes-per-page > 0`) 
+
 ## 0.58
 
 ### Added

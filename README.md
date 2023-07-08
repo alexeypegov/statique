@@ -18,7 +18,7 @@ Static site/blog generator written in Clojure
 
 ## Version
 
-0.58
+0.59
 
 ## Examples
 

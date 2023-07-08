@@ -66,6 +66,14 @@
     (exit -1 (format "Error: directory was not found (%s)" dir)))
   dir)
 
+(defn ?assoc
+  [m & ks]
+  (->> ks 
+    (partition 2)
+    (filter second)
+    (map vec)
+    (into m)))
+
 (defn prev-next
   "Lazily iterates over collection applying (fn cur, prev, next) to each element"
   ([cb col] (prev-next any? cb col))
