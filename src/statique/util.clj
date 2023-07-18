@@ -58,7 +58,7 @@
        default))))
 
 (defn validate-dir
-  "Checks whatever given file is directory and it is exist"
+  "Checks whether given file is directory and it is exist"
   [dir]
   (when-not (and
              (fs/directory? dir)
