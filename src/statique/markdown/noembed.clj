@@ -14,7 +14,7 @@
       (try
         (json/read-str body :key-fn keyword)
         (catch Throwable e
-          (log/warn url (.getMessage e))
+          (log/warn url (.getMessage e) body)
           {:error (.getMessage e) 
            :url   url}))
       (do 
