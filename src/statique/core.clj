@@ -125,15 +125,17 @@
   []
   (printf "Statique %s\n\n" cfg/app-version)
   (if (blog-dir? working-dir)
-    (let [config   (cfg/mk-config working-dir)
-          noembed  (mk-noembed-cache config)
-          renderer (mk-renderer config)]
-      (some->> (render0 reporter config renderer noembed)
-               write-changed
-               (copy-index config)
-               (generate-sitemap config renderer)
-               (reduce prepare-cache {})
-               (write-caches config noembed))
-      (s/copy config)
+    (let [[_ total-time] (u/timed
+                          (let [config   (cfg/mk-config working-dir)
+                                noembed  (mk-noembed-cache config)
+                                renderer (mk-renderer config)]
+                            (some->> (render0 reporter config renderer noembed)
+                                     write-changed
+                                     (copy-index config)
+                                     (generate-sitemap config renderer)
+                                     (reduce prepare-cache {})
+                                     (write-caches config noembed))
+                            (s/copy config)))]
+      (printf "\nGeneration completed in %s\n" (u/format-time total-time))
       (flush))
     (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir)))

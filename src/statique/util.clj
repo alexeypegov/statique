@@ -136,3 +136,19 @@
 (defmulti check-render-error :status)
 (defmethod check-render-error :ok [{:keys [result]}] result)
 (defmethod check-render-error :error [{:keys [message]}] (exit -1 message))
+
+(defmacro timed
+  "Times the execution of a function and returns [result elapsed-ms]"
+  [expr]
+  `(let [start# (System/nanoTime)
+         result# ~expr
+         elapsed# (/ (- (System/nanoTime) start#) 1000000.0)]
+     [result# elapsed#]))
+
+(defn format-time
+  "Formats time in milliseconds to a human readable string"
+  [ms]
+  (cond
+    (< ms 1000) (format "%.1fms" ms)
+    (< ms 60000) (format "%.2fs" (/ ms 1000.0))
+    :else (format "%.1fm" (/ ms 60000.0))))
