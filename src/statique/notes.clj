@@ -2,6 +2,7 @@
   (:require [statique.items :refer [item-seq]]
             [statique.config :refer [with-general]]
             [statique.util :as u]
+            [clojure.tools.logging :as log]
             [me.raynes.fs :as fs]
             [clj-uuid :as uuid]))
 

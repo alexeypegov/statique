@@ -6,9 +6,9 @@
   (:import [java.util Properties]
            [java.io FilenameFilter]))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (defmacro dbg
-  [x] 
+  [x]
   `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
 
 (defn working-dir
@@ -38,7 +38,7 @@
 
 (def name-comparator (fn [a b] (compare (.getName a) (.getName b))))
 
-(defn sorted-files 
+(defn sorted-files
   [dir name-filter]
   (list-files dir name-filter name-comparator))
 
@@ -68,11 +68,11 @@
 
 (defn ?assoc
   [m & ks]
-  (->> ks 
-    (partition 2)
-    (filter second)
-    (map vec)
-    (into m)))
+  (->> ks
+       (partition 2)
+       (filter second)
+       (map vec)
+       (into m)))
 
 (defn prev-next
   "Lazily iterates over collection applying (fn cur, prev, next) to each element"
@@ -152,3 +152,15 @@
     (< ms 1000) (format "%.1fms" ms)
     (< ms 60000) (format "%.2fs" (/ ms 1000.0))
     :else (format "%.1fm" (/ ms 60000.0))))
+
+(defmacro defnc [name deps args & body]
+  "Defines a function with context dependencies"
+  `(defn ~name [ctx# ~@args]
+     (let [~@(mapcat (fn [k] [k `(~k ctx#)]) deps)]
+       ~@body)))
+
+(defmacro defnc- [name deps args & body]
+  "Defines a private function with context dependencies"
+  `(defn- ~name [ctx# ~@args]
+     (let [~@(mapcat (fn [k] [k `(~k ctx#)]) deps)]
+       ~@body)))

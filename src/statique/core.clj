@@ -1,6 +1,7 @@
 (ns statique.core
   (:require [clojure.java.io :as io]
             [me.raynes.fs :as fs]
+            [clojure.tools.logging :as log]
             [statique.util :as u]
             [statique.notes :as n]
             [statique.freemarker :as fm]
@@ -13,12 +14,12 @@
 
 (def ^:private working-dir (u/working-dir))
 
-(defn- blog-dir? 
+(defn- blog-dir?
   [path]
   (let [file (io/as-file path)]
     (and
-      (.isDirectory file)
-      (.exists (io/file path cfg/config-name)))))
+     (.isDirectory file)
+     (.exists (io/file path cfg/config-name)))))
 
 (defn- transformer
   [config noembed type object]
@@ -35,7 +36,7 @@
   (let [file (cfg/get-cache-file config "noembed")]
     (u/file-cache file noembed/fetch)))
 
-(defn- mk-renderer 
+(defn- mk-renderer
   [config]
   (some->> (cfg/with-general config :theme-dir)
            (u/validate-dir)
@@ -57,7 +58,7 @@
         count   (count changed)]
     (when (> count 0)
       (doall (map file-writer changed))
-      (println "Items written:" count)
+      (log/info "Items written:" count)
       items)))
 
 (defn- most-recent-item
@@ -79,7 +80,7 @@
               index-file (io/file (.getParentFile last-file) "index.html")
               data       (:rendered last-item)]
           (u/write-file index-file data)
-          (println "Writing note" slug "as index.html")))))
+          (log/info "Writing note as index.html:" slug)))))
   items)
 
 (defn- prepare-cache
@@ -102,7 +103,7 @@
     (let [sitemap-item (partial n/sitemap-item config)
           output-dir   (cfg/with-general config :output-dir)
           target-file  (fs/file output-dir "sitemap.xml")]
-      (println "Writing sitemap.xml")
+      (log/info "Writing sitemap.xml")
       (->> {:items (filter some? (map sitemap-item (vals items)))}
            (renderer template)
            u/check-render-error
@@ -120,10 +121,10 @@
   [config noembed items]
   (cfg/dump-cache config "items" items)
   (cfg/dump-cache config "noembed" (noembed :all)))
-          
+
 (defn -main
   []
-  (printf "Statique %s\n\n" cfg/app-version)
+  (log/info "Statique" cfg/app-version)
   (if (blog-dir? working-dir)
     (let [[_ total-time] (u/timed
                           (let [config   (cfg/mk-config working-dir)
@@ -136,6 +137,6 @@
                                      (reduce prepare-cache {})
                                      (write-caches config noembed))
                             (s/copy config)))]
-      (printf "\nGeneration completed in %s\n" (u/format-time total-time))
+      (log/info "Generation completed in" (u/format-time total-time))
       (flush))
-    (printf "Unable to find config file (%s) in \"%s\"\n" cfg/config-name working-dir)))
+    (log/error "Unable to find config file (" cfg/config-name ") at:" (.getAbsolutePath working-dir))))

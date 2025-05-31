@@ -1,18 +1,18 @@
 (ns statique.static
   (:require [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [statique.config :refer [with-general]]
-            [me.raynes.fs :as fs]
-            #_[clojure.tools.logging :as log :refer [log warn error info]]))
+            [me.raynes.fs :as fs]))
 
 (defn- copy-file
   [file dst-dir]
-  (println (format "Copying \"%s\"..." file))
+  (log/info "Copying" file "-->" (.getAbsolutePath dst-dir))
   (let [filename (fs/base-name file)]
     (fs/copy+ file (io/file dst-dir filename))))
 
 (defn- copy-dir
   [dir dst-dir]
-  (println (format "Copying \"%s\"..." dir))
+  (log/info "Copying" dir "-->" (.getAbsolutePath dst-dir))
   (fs/copy-dir dir dst-dir))
 
 (defn copy

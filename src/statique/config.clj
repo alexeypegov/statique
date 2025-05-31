@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as s]
             [me.raynes.fs :as fs]
+            [clojure.tools.logging :as log]
             [statique.util :as u]
             [yaml.core :as yaml]))
 
@@ -27,8 +28,6 @@
                                              :feeds            			nil
                                              :copy             			nil}
                                    :vars    {}})
-
-
 
 (defn- with-defaults
   [config]
@@ -74,4 +73,4 @@
   (when (seq data)
     (let [file (get-cache-file cfg name)]
       (u/write-file file data :data true)
-      (println "Cache written:" name))))
+      (log/info "Cache written: " name))))
