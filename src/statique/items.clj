@@ -25,25 +25,26 @@
   ([page-size feed-size item-type page-index page-items feed-items col]
    (lazy-seq
     (cond
-      (and (> page-size 0)
-           (= page-size (count page-items))) (cons
-                                              (make-page page-items page-index (not (empty? col)))
-                                              (item-seq page-size feed-size item-type (inc page-index) [] feed-items col))
-      (and (> feed-size 0)
-           (= feed-size (count feed-items))) (cons
-                                              (make-feed feed-items)
-                                              (item-seq page-size -1 item-type page-index page-items [] col))
-      :else (if (not-empty col)
-              (let [item (first col)
-                    rest (rest col)]
-                (cons
-                 (make-item item-type item)
-                 (item-seq page-size feed-size item-type page-index (conj page-items item) (conj feed-items item) rest)))
-              (if (and (> page-size 0) (not-empty page-items))
-                (cons
-                 (make-page page-items page-index false)
-                 (item-seq page-size feed-size item-type page-index [] feed-items col))
-                (when (and (> feed-size 0) (not-empty feed-items))
-                  (cons
-                   (make-feed feed-items)
-                   (item-seq page-size feed-size item-type page-index page-items [] col)))))))))
+       ;; page when full
+      (and (pos? page-size) (= page-size (count page-items)))
+      (cons (make-page page-items page-index (boolean (seq col)))
+            (item-seq page-size feed-size item-type (inc page-index) [] feed-items col))
+
+       ;; feed then full
+      (and (pos? feed-size) (= feed-size (count feed-items)))
+      (cons (make-feed feed-items)
+            (item-seq page-size -1 item-type page-index page-items [] col))
+
+       ;; next item
+      (seq col)
+      (let [item (first col)]
+        (cons (make-item item-type item)
+              (item-seq page-size feed-size item-type page-index
+                        (conj page-items item) (conj feed-items item) (rest col))))
+
+      :else
+      (concat
+       (when (and (pos? page-size) (seq page-items))
+         [(make-page page-items page-index false)])
+       (when (and (pos? feed-size) (seq feed-items))
+         [(make-feed feed-items)]))))))
