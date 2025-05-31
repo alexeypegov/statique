@@ -73,4 +73,4 @@
   (when (seq data)
     (let [file (get-cache-file cfg name)]
       (u/write-file file data :data true)
-      (log/info "Cache written: " name))))
+      (log/info "Cache written:" name))))

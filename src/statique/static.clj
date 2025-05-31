@@ -6,13 +6,13 @@
 
 (defn- copy-file
   [file dst-dir]
-  (log/info "Copying" file "-->" (.getAbsolutePath dst-dir))
+  (log/info "Copying" file "—>" (.getAbsolutePath dst-dir))
   (let [filename (fs/base-name file)]
     (fs/copy+ file (io/file dst-dir filename))))
 
 (defn- copy-dir
   [dir dst-dir]
-  (log/info "Copying" dir "-->" (.getAbsolutePath dst-dir))
+  (log/info "Copying" dir "—>" (.getAbsolutePath dst-dir))
   (fs/copy-dir dir dst-dir))
 
 (defn copy
