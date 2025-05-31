@@ -110,12 +110,12 @@
            (u/write-file target-file))))
   items)
 
-(defn- render0
-  [reporter config renderer noembed]
-  (let [item-cache  (cfg/get-cache config "items")
-        transformer (partial transformer config noembed)]
-    (->> (n/generate-notes reporter config transformer renderer item-cache)
-         (n/generate-singles reporter config transformer renderer))))
+(u/defnc- render0 [config noembed] []
+  (let [items-cache  (cfg/get-cache config "items")
+        transformer  (partial transformer config noembed)
+        ctx2         (assoc $ctx :transformer transformer)]
+    (->> (n/generate-notes ctx2 items-cache)
+         (n/generate-singles ctx2))))
 
 (defn- write-caches
   [config noembed items]
@@ -130,7 +130,7 @@
                           (let [config   (cfg/mk-config working-dir)
                                 noembed  (mk-noembed-cache config)
                                 renderer (mk-renderer config)]
-                            (some->> (render0 reporter config renderer noembed)
+                            (some->> (render0 {:reporter reporter :config config :renderer renderer :noembed noembed})
                                      write-changed
                                      (copy-index config)
                                      (generate-sitemap config renderer)

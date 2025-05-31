@@ -153,14 +153,17 @@
     (< ms 60000) (format "%.2fs" (/ ms 1000.0))
     :else (format "%.1fm" (/ ms 60000.0))))
 
-(defmacro defnc [name deps args & body]
-  "Defines a function with context dependencies"
-  `(defn ~name [ctx# ~@args]
-     (let [~@(mapcat (fn [k] [k `(~k ctx#)]) deps)]
-       ~@body)))
+(defmacro with-context [ctx deps & body]
+  "Expands context"
+  `(let [~@(mapcat (fn [k] [k `(~(keyword k) ~ctx)]) deps)]
+     ~@body))
 
 (defmacro defnc- [name deps args & body]
-  "Defines a private function with context dependencies"
-  `(defn- ~name [ctx# ~@args]
-     (let [~@(mapcat (fn [k] [k `(~k ctx#)]) deps)]
+  `(defn- ~name [~'$ctx ~@args]
+     (with-context ~'$ctx ~deps
+       ~@body)))
+
+(defmacro defnc [name deps args & body]
+  `(defn ~name [~'$ctx ~@args]
+     (with-context ~'$ctx ~deps
        ~@body)))

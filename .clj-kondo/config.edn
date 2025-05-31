@@ -1,0 +1,3 @@
+{:hooks {:analyze-call {statique.util/defnc- hooks.defnc/defnc-
+                        statique.util/defnc hooks.defnc/defnc
+                        statique.util/with-context hooks.defnc/with-context}}}

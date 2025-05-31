@@ -66,15 +66,15 @@
      (not= count        (:count cached))))
   (populate [_ transformed]
     (u/?assoc {}
-     :source-crc  source-crc
-     :target-file target-file
-     :transformed transformed
-     :count       count))
+              :source-crc  source-crc
+              :target-file target-file
+              :transformed transformed
+              :count       count))
   (transform [_ transformer]
     (item-transform transformer :relative source-file slug))
   (render [_ props renderer transformed]
     (render-item props config renderer template transformed)))
-  
+
 (deftype PageHandler [config index slugs items target-file items-hash target-crc cached]
   Handler
   (id [_] index)
@@ -133,57 +133,61 @@
            (renderer name)
            u/check-render-error))))
 
-(defmulti mk-handler (fn [item & _] (:type item)))
+(defmulti mk-handler (fn [_ item _] (:type item)))
 
-(defmethod mk-handler :item [item {:keys [config items]}]
-  (let [notes-dir   (notes-dir config)
-        output-dir  (output-dir config)
-        slug        (:slug item)
-        count       (:count item)
-        real-slug   (or (:real-slug item) slug)
-        target-file (fs/file output-dir (str slug html-ext))
-        source-file (fs/file notes-dir (str real-slug md-ext))
-        source-crc  (u/crc32 source-file)
-        target-crc  (u/crc32 target-file)
-        cached      (get items slug {})]
-    (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc cached)))
+(defmethod mk-handler :item [ctx item items]
+  (u/with-context ctx [config]
+    (let [notes-dir   (notes-dir config)
+          output-dir  (output-dir config)
+          slug        (:slug item)
+          count       (:count item)
+          real-slug   (or (:real-slug item) slug)
+          target-file (fs/file output-dir (str slug html-ext))
+          source-file (fs/file notes-dir (str real-slug md-ext))
+          source-crc  (u/crc32 source-file)
+          target-crc  (u/crc32 target-file)
+          cached      (get items slug {})]
+      (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc cached))))
 
-(defmethod mk-handler :page [page {:keys [config items]}]
-  (let [index       (:index page)
-        slugs       (:items page)
-        output-dir  (output-dir config)
-        filename    (page-filename config index)
-        target-file (fs/file output-dir filename)
-        target-crc  (u/crc32 target-file)
-        items-hash  (hash slugs)
-        cached      (get items index {})]
-    (->PageHandler config index slugs items target-file items-hash target-crc cached)))
+(defmethod mk-handler :page [ctx page items]
+  (u/with-context ctx [config]
+    (let [index       (:index page)
+          slugs       (:items page)
+          output-dir  (output-dir config)
+          filename    (page-filename config index)
+          target-file (fs/file output-dir filename)
+          target-crc  (u/crc32 target-file)
+          items-hash  (hash slugs)
+          cached      (get items index {})]
+      (->PageHandler config index slugs items target-file items-hash target-crc cached))))
 
-(defmethod mk-handler :feed [feed {:keys [config items]}]
-  (let [name        (:name feed)
-        slugs       (:slugs feed)
-        filename    (str name xml-ext)
-        output-dir  (output-dir config)
-        target-file (fs/file output-dir filename)
-        target-crc  (u/crc32 target-file)
-        items-hash  (hash slugs)
-        cached      (get items name {})]
-    (->FeedHandler config name slugs items target-file items-hash target-crc cached)))
-    
-(defmethod mk-handler :single [item {:keys [config items]}]
-  (let [singles-dir (with-general config :singles-dir)
-        output-dir  (output-dir config)
-        slug        (:slug item)
-        source-file (fs/file singles-dir (str slug md-ext))
-        target-file (fs/file output-dir (str slug html-ext))
-        source-crc  (u/crc32 source-file)
-        target-crc  (u/crc32 target-file)
-        cached      (get items slug {})]
-    (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc cached)))
+(defmethod mk-handler :feed [ctx feed items]
+  (u/with-context ctx [config]
+    (let [name        (:name feed)
+          slugs       (:slugs feed)
+          filename    (str name xml-ext)
+          output-dir  (output-dir config)
+          target-file (fs/file output-dir filename)
+          target-crc  (u/crc32 target-file)
+          items-hash  (hash slugs)
+          cached      (get items name {})]
+      (->FeedHandler config name slugs items target-file items-hash target-crc cached))))
 
-(defn- process-item [reporter transformer renderer {:keys [items] :as ctx} item]
+(defmethod mk-handler :single [ctx item items]
+  (u/with-context ctx [config]
+    (let [singles-dir (with-general config :singles-dir)
+          output-dir  (output-dir config)
+          slug        (:slug item)
+          source-file (fs/file singles-dir (str slug md-ext))
+          target-file (fs/file output-dir (str slug html-ext))
+          source-crc  (u/crc32 source-file)
+          target-crc  (u/crc32 target-file)
+          cached      (get items slug {})]
+      (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc cached))))
+
+(u/defnc- process-item [reporter transformer renderer] [items-cache item]
   (let [type      (:type item)
-        handler   (mk-handler item ctx)
+        handler   (mk-handler $ctx item items-cache)
         changed?  (changed? handler)]
     (if changed?
       (do
@@ -196,11 +200,10 @@
             (assoc $ :changed? changed?)
             (assoc $ :rendered rendered)
             (assoc $ :type type)
-            (assoc items (id handler) $)
-            (assoc ctx :items $))))
-      ctx)))
+            (assoc items-cache (id handler) $))))
+      items-cache)))
 
-(defmulti process (fn [& args] (:type (last args))))
+(defmulti process (fn [_ _ item] (:type item)))
 
 (defmethod process :item [& args]
   (apply process-item args))
@@ -208,15 +211,16 @@
 (defmethod process :page [& args]
   (apply process-item args))
 
-(defmethod process :feed [reporter transformer renderer {:keys [config] :as context} {slugs :items}]
-  (let [feeds (with-general config :feeds)
-        proc  (partial process-item reporter transformer renderer)]
-    (->> (map #(assoc {}
-                      :type :feed
-                      :name %
-                      :slugs slugs)
-              feeds)
-         (reduce proc context))))
+(defmethod process :feed [ctx items-cache {slugs :items}]
+  (u/with-context ctx [config]
+    (let [feeds (with-general config :feeds)
+          proc  (partial process-item ctx)]
+      (->> (map #(assoc {}
+                        :type :feed
+                        :name %
+                        :slugs slugs)
+                feeds)
+           (reduce proc items-cache)))))
 
 (defmethod process :single [& args]
   (apply process-item args))
@@ -235,33 +239,25 @@
              :next  (:slug %2))
      coll)))
 
-(defn generate-notes
-  [reporter config transformer renderer items-cache]
+(u/defnc generate-notes [config] [items-cache]
   (when-let [notes-dir (u/validate-dir (with-general config :notes-dir))]
     (let [page-size    (with-general config :notes-per-page)
           feed-size    (with-general config :items-per-feed)
           files        (reverse (u/sorted-files notes-dir markdown-filter))
           slugs        (map u/slug files)
-          proc         (partial process reporter transformer renderer)
-          context      {:config config
-                        :items  items-cache}
+          proc         (partial process $ctx)
           pageless     (= page-size 0)]
-     (->> (item-seq page-size feed-size slugs)
-          (prev-next pageless)
-          (reduce proc context)
-          :items))))
+      (->> (item-seq page-size feed-size slugs)
+           (prev-next pageless)
+           (reduce proc items-cache)))))
 
-(defn generate-singles
-  [reporter config transformer renderer items-cache]
+(u/defnc generate-singles [config] [items-cache]
   (let [singles-dir (with-general config :singles-dir)
-        files (u/list-files singles-dir markdown-filter)
-        slugs (map u/slug files)
-        proc (partial process reporter transformer renderer)
-        context {:config config
-                 :items  items-cache}]
+        files       (u/list-files singles-dir markdown-filter)
+        slugs       (map u/slug files)
+        proc        (partial process $ctx)]
     (->> (item-seq :single slugs)
-         (reduce proc context)
-         :items)))
+         (reduce proc items-cache))))
 
 (defmulti sitemap-item (fn [_ props] (:type props)))
 (defmethod sitemap-item :page [_ _] nil)
@@ -271,4 +267,3 @@
         transformed  (:transformed props)]
     (assoc transformed
            :loc (str base-url (:slug transformed) html-ext))))
-  

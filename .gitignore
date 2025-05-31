@@ -8,7 +8,9 @@ pom.xml.asc
 *.class
 /.lein-*
 /.nrepl-port
-.clj-kondo
+.clj-kondo/*
+!.clj-kondo/config.edn
+!.clj-kondo/hooks
 .lsp
 bin/
 example/out
