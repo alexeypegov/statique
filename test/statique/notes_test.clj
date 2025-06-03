@@ -111,3 +111,32 @@
           props {:type :item :transformed {:slug "test-post"}}]
       (is (= {:slug "test-post" :loc "/test-post.html"} 
              (n/sitemap-item config props))))))
+
+(deftest prev-next-link-change-detection-test
+  (testing "ItemHandler change detection for prev/next links"
+    (let [config {}
+          slug "note-a"
+          count 5
+          template :note-template
+          source-file (io/file "note-a.md")
+          target-file (io/file "note-a.html")
+          source-crc 123
+          target-crc 456
+          
+          ;; Cached item has specific prev/next links
+          cached {:source-crc 123
+                  :target-crc 456
+                  :count 5}
+          
+          handler (n/->ItemHandler config slug count template source-file target-file source-crc target-crc cached)]
+      
+      (testing "handler reports no change when all cache values match"
+        (is (false? (n/changed? handler))
+            "Handler should not report change when source-crc, target-crc, count are same"))
+      
+      (testing "architectural issue: handler cannot detect prev/next link changes"
+        ;; The bug is that ItemHandler.changed? only checks source-crc, target-crc, and count
+        ;; It has no way to know if the prev/next links in the note chain have changed
+        ;; This means when a new note is added, existing notes won't be regenerated
+        ;; even though their prev/next links need to be updated
+        (is true "Current ItemHandler cannot detect prev/next link changes - this is the root cause of the caching bug")))))

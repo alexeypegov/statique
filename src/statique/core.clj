@@ -1,15 +1,13 @@
 (ns statique.core
   (:require [clojure.java.io :as io]
-            [me.raynes.fs :as fs]
             [clojure.tools.logging :as log]
             [statique.util :as u]
-            [statique.notes :as n]
             [statique.freemarker :as fm]
             [statique.markdown.noembed :as noembed]
             [statique.markdown.markdown :as md]
             [statique.markdown.renderers :as r]
             [statique.config :as cfg]
-            [statique.static :as s])
+            [statique.pipeline :as pipeline])
   (:gen-class))
 
 (def ^:private working-dir (u/working-dir))
@@ -43,50 +41,6 @@
            (fm/make-config)
            (partial fm/render)))
 
-(defn- file-writer
-  [item]
-  (when (:changed? item)
-    (let [file (:target-file item)
-          data (:rendered item)]
-      (u/write-file file data)
-      file)))
-
-(defn- write-changed
-  [items]
-  (let [vals    (vals items)
-        changed (filter :changed? vals)
-        count   (count changed)]
-    (when (> count 0)
-      (doall (map file-writer changed))
-      (log/info "Items written:" count)
-      items)))
-
-(defn- most-recent-item
-  [items]
-  (->> (vals items)
-       (filter #(= :item (:type %)))
-       (sort #(compare
-               (get-in %2 [:transformed :slug])
-               (get-in %1 [:transformed :slug])))
-       first))
-
-(defn- copy-index
-  [config items]
-  (when (cfg/with-general config :copy-last-as-index)
-    (let [last-item (most-recent-item items)]
-      (when (:changed? last-item)
-        (let [slug       (get-in last-item [:transformed :slug])
-              last-file  (:target-file last-item)
-              index-file (io/file (.getParentFile last-file) "index.html")
-              data       (:rendered last-item)]
-          (u/write-file index-file data)
-          (log/info "Writing note as index.html:" slug)))))
-  items)
-
-(defn- prepare-cache
-  [r [k v]]
-  (assoc r k (dissoc v :rendered :target-file :changed?)))
-
 (defmulti reporter (fn [type _] type))
 (defmethod reporter [:render :item] [_ key]
   (println "Rendering note:" key))
@@ -97,46 +51,16 @@
 (defmethod reporter [:render :single] [_ name]
   (println "Rendering single page:" name))
 
-(defn- generate-sitemap
-  [config renderer items]
-  (when-let [template (cfg/with-general config :sitemap-template)]
-    (let [sitemap-item (partial n/sitemap-item config)
-          output-dir   (cfg/with-general config :output-dir)
-          target-file  (fs/file output-dir "sitemap.xml")]
-      (log/info "Writing sitemap.xml")
-      (->> {:items (filter some? (map sitemap-item (vals items)))}
-           (renderer template)
-           u/check-render-error
-           (u/write-file target-file))))
-  items)
-
-(u/defnc- render0 [config noembed] []
-  (let [items-cache  (cfg/get-cache config "items")
-        transformer  (partial transformer config noembed)
-        ctx2         (assoc $ctx :transformer transformer)]
-    (->> (n/generate-notes ctx2 items-cache)
-         (n/generate-singles ctx2))))
-
-(defn- write-caches
-  [config noembed items]
-  (cfg/dump-cache config "items" items)
-  (cfg/dump-cache config "noembed" (noembed :all)))
-
 (defn -main
   []
   (log/info "Statique" cfg/app-version)
   (if (blog-dir? working-dir)
     (let [[_ total-time] (u/timed
-                          (let [config   (cfg/mk-config working-dir)
-                                noembed  (mk-noembed-cache config)
-                                renderer (mk-renderer config)]
-                            (some->> (render0 {:reporter reporter :config config :renderer renderer :noembed noembed})
-                                     write-changed
-                                     (copy-index config)
-                                     (generate-sitemap config renderer)
-                                     (reduce prepare-cache {})
-                                     (write-caches config noembed))
-                            (s/copy config)))]
+                          (let [config      (cfg/mk-config working-dir)
+                                noembed     (mk-noembed-cache config)
+                                transformer (partial transformer config noembed)
+                                renderer    (mk-renderer config)]
+                            (pipeline/build-site config noembed transformer renderer reporter)))]
       (log/info "Generation completed in" (u/format-time total-time))
       (flush))
     (log/error "Unable to find config file (" cfg/config-name ") at:" (.getAbsolutePath working-dir))))
