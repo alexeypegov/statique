@@ -3,113 +3,111 @@
             [statique.notes :as n]
             [statique.config :as cfg]
             [statique.util :as u]
-            [clojure.test :refer [deftest]]))
+            [clojure.test :refer [deftest is are testing use-fixtures]]
+            [clj-uuid :as uuid]))
 
 (def ^:private working-dir (io/file "/working-dir/"))
 
-#_(defn setup [f]
-  (with-redefs [cfg/general (fn [key] (key {:root-dir        working-dir
-                                            :date-format     "yyyy-MM-dd"
-                                            :tz              "Europe/Moscow"
-                                            :output-dir      (io/file working-dir "out/")
-                                            :index-page-name "index"}))
-                u/crc32     (constantly 777)]
+(defn setup [f]
+  (with-redefs [cfg/with-general (fn [config key]
+                                     (get {:notes-dir        "notes/"
+                                           :output-dir       (io/file working-dir "out/")
+                                           :singles-dir      "singles/"
+                                           :index-page-name  "index"
+                                           :page-prefix      "page-"
+                                           :note-template    "note"
+                                           :page-template    "page"
+                                           :single-template  "single"
+                                           :base-url         "/"
+                                           :notes-per-page   10
+                                           :items-per-feed   10
+                                           :feeds            ["atom"]
+                                           :vars             {}} key))
+                u/crc32           (constantly 777)
+                u/validate-dir    identity
+                u/sorted-files    (constantly [])
+                u/list-files      (constantly [])
+                uuid/v3           (constantly "test-uuid")]
     (f)))
 
-#_(use-fixtures :once setup)
+(use-fixtures :once setup)
 
-#_(deftest item-changed?
-  (let [item-changed? #'n/item-changed?]
-    (are [result source-crc-current target-crc-current item] (= result (item-changed? :nope item source-crc-current target-crc-current))
-      true  1 nil {}
-      true  2 nil {:source-crc 1}
-      true  1 2   {:source-crc 1}
-      true  1 2   {:source-crc 1 :target-crc 1}
-      false 1 2   {:source-crc 1 :target-crc 2})))
+(deftest item-transform-test
+  (testing "item-transform creates proper item structure"
+    (with-redefs [slurp (constantly "# Test\nContent")]
+      (let [transformer (fn [type text] {:content text :title "Test"})
+            result (n/item-transform transformer :relative (io/file "test.md") "test-slug")]
+        (is (= "test-slug" (:slug result)))
+        (is (= "/test-slug.html" (:link result)))
+        (is (= "test-uuid" (:uuid result)))
+        (is (= "Test" (:title result)))
+        (is (= "# Test\nContent" (:content result)))))))
 
-#_(deftest make-item-map
-  (with-redefs [clj-uuid/v3 (constantly 1)]
-    (let [make-item-map #'n/make-item-map]
-      (is (= {:source-file     (io/file working-dir "notes/some_file.md")
-              :source-relative "notes/some_file.md"
-              :target-file     (io/file working-dir "out/some_file.html")
-              :target-relative "out/some_file.html"
-              :source-crc      777
-              :target-crc      777
-              :changed         true
-              :slug            "some_file"
-              :link            "/some_file.html"
-              :uuid            1}
-             (make-item-map (constantly nil) :nope (io/file working-dir "notes/some_file.md"))))
-      (is (= {:source-file     (io/file working-dir "notes/some_unchanged.md")
-              :source-relative "notes/some_unchanged.md"
-              :target-file     (io/file working-dir "out/some_unchanged.html")
-              :target-relative "out/some_unchanged.html"
-              :slug            "some_unchanged"
-              :link            "/some_unchanged.html"
-              :uuid            1
-              :source-crc      777
-              :target-crc      777
-              :changed         false}
-             (make-item-map (constantly {:source-crc 777 :target-crc 777}) :nope (io/file working-dir "notes/some_unchanged.md")))))))
+(deftest page-filename-test
+  (testing "page-filename generates correct filenames"
+    (let [config {}]
+      (is (= "index.html" (#'n/page-filename config 1)))
+      (is (= "page-2.html" (#'n/page-filename config 2)))
+      (is (= "page-10.html" (#'n/page-filename config 10))))))
 
-#_(deftest page-changed?
-  (let [page-changed? #'n/page-changed?]
-    (are [result target-crc-current items-crc-current items page] (= result (page-changed? page items target-crc-current items-crc-current))
-      true  1 nil [] {}
-      true  2 nil [] {:target-crc 1}
-      true  1 1   [] {:target-crc 1}
-      true  1 2   [] {:target-crc 1
-                      :items-hash 1}
-      true  1 2   '({:changed true}) {:target-crc 1
-                                      :items-hash 2}
-      false 1 2   '({:changed false}
-                    {:changed false}) {:target-crc 1
-                                       :items-hash 2})))
+(deftest items-changed-test
+  (testing "items-changed? detects changes in items"
+    (let [items {"a" {:changed? true}
+                 "b" {:changed? false}
+                 "c" {:changed? true}}]
+      (is (true? (#'n/items-changed? ["a"] items)))
+      (is (true? (#'n/items-changed? ["a" "b"] items)))
+      (is (false? (#'n/items-changed? ["b"] items)))
+      (is (false? (#'n/items-changed? [] items))))))
 
-#_(deftest make-page
-  (with-redefs [cfg/notes-cache (delay {:pages {1 {:target-crc 666}}})]
-    (let [make-page #'n/make-page]
-      (is (= {:type            :page
-              :index           1
-              :items           '({:slug "slug1"} {:slug "slug2"})
-              :target-file     (io/file working-dir "out/index.html")
-              :target-relative "out/index.html"
-              :items-hash      -346581602
-              :changed         true
-              :target-crc      777}
-             (make-page {:index 1
-                         :items '({:slug "slug1"}
-                                  {:slug "slug2"})}))))))
+(deftest handler-protocol-test
+  (testing "ItemHandler implements Handler protocol correctly"
+    (let [config {}
+          cached {:source-crc 777 :target-crc 777 :count 5}
+          handler (n/->ItemHandler config "test-slug" 5 :note-template 
+                                   (io/file "source.md") (io/file "target.html") 
+                                   777 777 cached)]
+      (is (= "test-slug" (n/id handler)))
+      (is (false? (n/changed? handler)))
+      
+      (let [populated (n/populate handler {:title "Test"})]
+        (is (= 777 (:source-crc populated)))
+        (is (= 5 (:count populated))))))
+  
+  (testing "ItemHandler detects changes correctly"
+    (let [config {}
+          cached {:source-crc 555 :target-crc 777 :count 5}  ; Different source CRC
+          handler (n/->ItemHandler config "test-slug" 5 :note-template 
+                                   (io/file "source.md") (io/file "target.html") 
+                                   777 777 cached)]
+      (is (true? (n/changed? handler)))))
+  
+  (testing "PageHandler implements Handler protocol correctly"
+    (let [config {}
+          items {"slug1" {:changed? false} "slug2" {:changed? false}}
+          cached {:target-crc 777 :items-hash 123}
+          handler (n/->PageHandler config 1 ["slug1" "slug2"] items 
+                                   (io/file "page.html") 123 777 cached)]
+      (is (= 1 (n/id handler)))
+      (is (false? (n/changed? handler)))))
+  
+  (testing "FeedHandler implements Handler protocol correctly"
+    (let [config {}
+          items {"slug1" {:changed? false}}
+          cached {:target-crc 777 :items-hash 123}
+          handler (n/->FeedHandler config "atom" ["slug1"] items 
+                                   (io/file "atom.xml") 123 777 cached)]
+      (is (= "atom" (n/id handler)))
+      (is (false? (n/changed? handler))))))
 
-#_(deftest feed-changed?
-  (let [feed-changed? #'n/feed-changed?]
-    (with-redefs [me.raynes.fs/exists? (fn [f] (= "exists.xml" f))]
-      (are [result target-crc-current feed] (= result (feed-changed? feed target-crc-current))
-        true  1 {}
-        true  1 {:target-crc 2}
-        false 1 {:target-crc 1}))))
-
-#_(deftest make-feed
-  (with-redefs [cfg/notes-cache (delay {:feeds {"rss" {:target-crc 666}}})]
-    (let [make-feed #'n/make-feed]
-      (is (= {:type            :feed
-              :name            "rss"
-              :target-file     (io/file working-dir "out/rss.xml")
-              :target-relative "out/rss.xml"
-              :changed         true
-              :target-crc      777}
-             (make-feed "rss"))))))
-
-#_(deftest format-dates
-  (let [prepare-dates #'n/prepare-dates]
-    (is (= {:created-at   "2020-04-22T00:00:00+03:00"}
-           (prepare-dates "2020-04-22" "Europe/Moscow")))))
-
-#_(deftest check-error
-  (let [check-error #'n/check-error]
-    (with-redefs [u/exit (fn [code message] (str code " " message))]
-      (is (= "-1 something"
-             (check-error {:status :error :message "something" :model {:fail true}})))
-      (is (= "yay"
-             (check-error {:status :ok :result "yay"}))))))
+(deftest sitemap-item-test
+  (testing "sitemap-item returns nil for pages and feeds"
+    (let [config {}]
+      (is (nil? (n/sitemap-item config {:type :page})))
+      (is (nil? (n/sitemap-item config {:type :feed})))))
+  
+  (testing "sitemap-item creates sitemap entry for items"
+    (let [config {}
+          props {:type :item :transformed {:slug "test-post"}}]
+      (is (= {:slug "test-post" :loc "/test-post.html"} 
+             (n/sitemap-item config props))))))
