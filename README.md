@@ -18,7 +18,7 @@ Static site/blog generator written in Clojure
 
 ## Version
 
-0.59
+0.61
 
 ## Examples
 
@@ -34,7 +34,7 @@ Run `statique` in a directory with `blog.yaml`
 
 ## License
 
-Copyright © 2018-2023 Alexey Pegov
+Copyright © 2018-2025 Alexey Pegov
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
@@ -45,4 +45,4 @@ your option) any later version.
 [rss]: https://www.rssboard.org/rss-specification
 [atom]: https://validator.w3.org/feed/docs/atom.html
 [noembed]: https://noembed.com
-[own]: https://github.com/alexeypegov.com/pegov.io
+[own]: https://github.com/alexeypegov/pegov.io
