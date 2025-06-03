@@ -56,20 +56,24 @@
   (transform [this transformer])
   (render [this props renderer transformed]))
 
-(deftype ItemHandler [config slug count template source-file target-file source-crc target-crc cached]
+(deftype ItemHandler [config slug count template source-file target-file source-crc target-crc prev next cached]
   Handler
   (id [_] slug)
   (changed? [_]
     (or
      (not= source-crc   (:source-crc cached))
      (not= target-crc   (:target-crc cached))
-     (not= count        (:count cached))))
+     (not= count        (:count cached))
+     (not= prev         (:prev cached))
+     (not= next         (:next cached))))
   (populate [_ transformed]
     (u/?assoc {}
               :source-crc  source-crc
               :target-file target-file
               :transformed transformed
-              :count       count))
+              :count       count
+              :prev        prev
+              :next        next))
   (transform [_ transformer]
     (item-transform transformer :relative source-file slug))
   (render [_ props renderer transformed]
@@ -141,13 +145,15 @@
           output-dir  (output-dir config)
           slug        (:slug item)
           count       (:count item)
+          prev        (:prev item)
+          next        (:next item)
           real-slug   (or (:real-slug item) slug)
           target-file (fs/file output-dir (str slug html-ext))
           source-file (fs/file notes-dir (str real-slug md-ext))
           source-crc  (u/crc32 source-file)
           target-crc  (u/crc32 target-file)
           cached      (get items slug {})]
-      (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc cached))))
+      (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc prev next cached))))
 
 (defmethod mk-handler :page [ctx page items]
   (u/with-context ctx [config]
@@ -183,7 +189,7 @@
           source-crc  (u/crc32 source-file)
           target-crc  (u/crc32 target-file)
           cached      (get items slug {})]
-      (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc cached))))
+      (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc nil nil cached))))
 
 (u/defnc- process-item [reporter transformer renderer] [items-cache item]
   (let [type      (:type item)

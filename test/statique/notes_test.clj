@@ -66,7 +66,7 @@
           cached {:source-crc 777 :target-crc 777 :count 5}
           handler (n/->ItemHandler config "test-slug" 5 :note-template 
                                    (io/file "source.md") (io/file "target.html") 
-                                   777 777 cached)]
+                                   777 777 nil nil cached)]
       (is (= "test-slug" (n/id handler)))
       (is (false? (n/changed? handler)))
       
@@ -79,7 +79,7 @@
           cached {:source-crc 555 :target-crc 777 :count 5}  ; Different source CRC
           handler (n/->ItemHandler config "test-slug" 5 :note-template 
                                    (io/file "source.md") (io/file "target.html") 
-                                   777 777 cached)]
+                                   777 777 nil nil cached)]
       (is (true? (n/changed? handler)))))
   
   (testing "PageHandler implements Handler protocol correctly"
@@ -128,15 +128,25 @@
                   :target-crc 456
                   :count 5}
           
-          handler (n/->ItemHandler config slug count template source-file target-file source-crc target-crc cached)]
+          handler (n/->ItemHandler config slug count template source-file target-file source-crc target-crc nil nil cached)]
       
       (testing "handler reports no change when all cache values match"
         (is (false? (n/changed? handler))
             "Handler should not report change when source-crc, target-crc, count are same"))
       
-      (testing "architectural issue: handler cannot detect prev/next link changes"
-        ;; The bug is that ItemHandler.changed? only checks source-crc, target-crc, and count
-        ;; It has no way to know if the prev/next links in the note chain have changed
-        ;; This means when a new note is added, existing notes won't be regenerated
-        ;; even though their prev/next links need to be updated
-        (is true "Current ItemHandler cannot detect prev/next link changes - this is the root cause of the caching bug")))))
+      (testing "handler can detect prev/next link changes"
+        ;; Test that ItemHandler correctly detects when prev/next links change
+        (let [handler-with-different-prev (n/->ItemHandler config slug count template source-file target-file source-crc target-crc "different-prev" nil cached)
+              handler-with-different-next (n/->ItemHandler config slug count template source-file target-file source-crc target-crc nil "different-next" cached)]
+          (is (true? (n/changed? handler-with-different-prev))
+              "Handler should detect change when prev link differs from cache")
+          (is (true? (n/changed? handler-with-different-next))
+              "Handler should detect change when next link differs from cache")))
+      
+      (testing "handler stores prev/next in cache"
+        (let [handler-with-links (n/->ItemHandler config slug count template source-file target-file source-crc target-crc "prev-slug" "next-slug" cached)
+              populated (n/populate handler-with-links {:title "Test"})]
+          (is (= "prev-slug" (:prev populated))
+              "Populated data should include prev link")
+          (is (= "next-slug" (:next populated))
+              "Populated data should include next link"))))))
