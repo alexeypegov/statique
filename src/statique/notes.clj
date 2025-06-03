@@ -14,6 +14,11 @@
 (defn- notes-dir [cfg] (with-general cfg :notes-dir))
 (defn- output-dir [cfg] (with-general cfg :output-dir))
 
+(defn- file-with-crc
+  [dir filename]
+  (let [file (fs/file dir filename)]
+    {:file file :crc (u/crc32 file)}))
+
 (defn- render-context
   [config props & kvs]
   (-> props
@@ -53,26 +58,26 @@
   (transform [this transformer])
   (render [this props renderer transformed]))
 
-(deftype ItemHandler [config slug count template source-file target-file source-crc target-crc prev next cached]
+(deftype ItemHandler [config slug count template source target prev next cached]
   Handler
   (id [_] slug)
   (changed? [_]
     (or
-     (not= source-crc   (:source-crc cached))
-     (not= target-crc   (:target-crc cached))
-     (not= count        (:count cached))
-     (not= prev         (:prev cached))
-     (not= next         (:next cached))))
+     (not= (:crc source)   (:source-crc cached))
+     (not= (:crc target)   (:target-crc cached))
+     (not= count           (:count cached))
+     (not= prev            (:prev cached))
+     (not= next            (:next cached))))
   (populate [_ transformed]
     (u/?assoc {}
-              :source-crc  source-crc
-              :target-file target-file
+              :source-crc  (:crc source)
+              :target-file (:file target)
               :transformed transformed
               :count       count
               :prev        prev
               :next        next))
   (transform [_ transformer]
-    (item-transform transformer :relative source-file slug))
+    (item-transform transformer :relative (:file source) slug))
   (render [_ props renderer transformed]
     (let [tpl (with-general config template)]
       (->> (render-context config props)
@@ -80,17 +85,17 @@
            (renderer tpl)
            u/check-render-error))))
 
-(deftype PageHandler [config index slugs items target-file items-hash target-crc cached]
+(deftype PageHandler [config index slugs items target items-hash cached]
   Handler
   (id [_] index)
   (changed? [_]
     (or
-     (not= target-crc (:target-crc cached))
-     (not= items-hash (:items-hash cached))
+     (not= (:crc target) (:target-crc cached))
+     (not= items-hash    (:items-hash cached))
      (items-changed? slugs items)))
   (populate [_ _]
     {:items-hash  items-hash
-     :target-file target-file})
+     :target-file (:file target)})
   (transform [_ _]
     (map #(:transformed (get items %)) slugs))
   (render [_ props renderer transformed]
@@ -107,17 +112,17 @@
            (renderer template)
            u/check-render-error))))
 
-(deftype FeedHandler [config name slugs items target-file items-hash target-crc cached]
+(deftype FeedHandler [config name slugs items target items-hash cached]
   Handler
   (id [_] name)
   (changed? [_]
     (or
-     (not= target-crc (:target-crc cached))
-     (not= items-hash (:items-hash cached))
+     (not= (:crc target) (:target-crc cached))
+     (not= items-hash    (:items-hash cached))
      (items-changed? slugs items)))
   (populate [_ _]
     {:items-hash  items-hash
-     :target-file target-file})
+     :target-file (:file target)})
   (transform [_ transformer]
     (let [transform (partial item-transform transformer :absolute)]
       (letfn [(tr [slug]
@@ -145,12 +150,10 @@
           prev        (:prev item)
           next        (:next item)
           real-slug   (or (:real-slug item) slug)
-          target-file (fs/file output-dir (str slug html-ext))
-          source-file (fs/file notes-dir (str real-slug md-ext))
-          source-crc  (u/crc32 source-file)
-          target-crc  (u/crc32 target-file)
+          source      (file-with-crc notes-dir (str real-slug md-ext))
+          target      (file-with-crc output-dir (str slug html-ext))
           cached      (get items slug {})]
-      (->ItemHandler config slug count :note-template source-file target-file source-crc target-crc prev next cached))))
+      (->ItemHandler config slug count :note-template source target prev next cached))))
 
 (defmethod mk-handler :page [ctx page items]
   (u/with-context ctx [config]
@@ -158,11 +161,10 @@
           slugs       (:items page)
           output-dir  (output-dir config)
           filename    (page-filename config index)
-          target-file (fs/file output-dir filename)
-          target-crc  (u/crc32 target-file)
+          target      (file-with-crc output-dir filename)
           items-hash  (hash slugs)
           cached      (get items index {})]
-      (->PageHandler config index slugs items target-file items-hash target-crc cached))))
+      (->PageHandler config index slugs items target items-hash cached))))
 
 (defmethod mk-handler :feed [ctx feed items]
   (u/with-context ctx [config]
@@ -170,23 +172,20 @@
           slugs       (:slugs feed)
           filename    (str name xml-ext)
           output-dir  (output-dir config)
-          target-file (fs/file output-dir filename)
-          target-crc  (u/crc32 target-file)
+          target      (file-with-crc output-dir filename)
           items-hash  (hash slugs)
           cached      (get items name {})]
-      (->FeedHandler config name slugs items target-file items-hash target-crc cached))))
+      (->FeedHandler config name slugs items target items-hash cached))))
 
 (defmethod mk-handler :single [ctx item items]
   (u/with-context ctx [config]
     (let [singles-dir (with-general config :singles-dir)
           output-dir  (output-dir config)
           slug        (:slug item)
-          source-file (fs/file singles-dir (str slug md-ext))
-          target-file (fs/file output-dir (str slug html-ext))
-          source-crc  (u/crc32 source-file)
-          target-crc  (u/crc32 target-file)
+          source      (file-with-crc singles-dir (str slug md-ext))
+          target      (file-with-crc output-dir (str slug html-ext))
           cached      (get items slug {})]
-      (->ItemHandler config slug nil :single-template source-file target-file source-crc target-crc nil nil cached))))
+      (->ItemHandler config slug nil :single-template source target nil nil cached))))
 
 (u/defnc- process-item [reporter transformer renderer] [items-cache item]
   (let [type      (:type item)

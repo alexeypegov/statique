@@ -3,13 +3,13 @@
             [statique.notes :as n]
             [statique.config :as cfg]
             [statique.util :as u]
-            [clojure.test :refer [deftest is are testing use-fixtures]]
+            [clojure.test :refer [deftest is testing use-fixtures]]
             [clj-uuid :as uuid]))
 
 (def ^:private working-dir (io/file "/working-dir/"))
 
 (defn setup [f]
-  (with-redefs [cfg/with-general (fn [config key]
+  (with-redefs [cfg/with-general (fn [_config key]
                                      (get {:notes-dir        "notes/"
                                            :output-dir       (io/file working-dir "out/")
                                            :singles-dir      "singles/"
@@ -35,7 +35,7 @@
 (deftest item-transform-test
   (testing "item-transform creates proper item structure"
     (with-redefs [slurp (constantly "# Test\nContent")]
-      (let [transformer (fn [type text] {:content text :title "Test"})
+      (let [transformer (fn [_type text] {:content text :title "Test"})
             result (n/item-transform transformer :relative (io/file "test.md") "test-slug")]
         (is (= "test-slug" (:slug result)))
         (is (= "/test-slug.html" (:link result)))
@@ -65,8 +65,8 @@
     (let [config {}
           cached {:source-crc 777 :target-crc 777 :count 5}
           handler (n/->ItemHandler config "test-slug" 5 :note-template 
-                                   (io/file "source.md") (io/file "target.html") 
-                                   777 777 nil nil cached)]
+                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777} 
+                                   nil nil cached)]
       (is (= "test-slug" (n/id handler)))
       (is (false? (n/changed? handler)))
       
@@ -78,8 +78,8 @@
     (let [config {}
           cached {:source-crc 555 :target-crc 777 :count 5}  ; Different source CRC
           handler (n/->ItemHandler config "test-slug" 5 :note-template 
-                                   (io/file "source.md") (io/file "target.html") 
-                                   777 777 nil nil cached)]
+                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777} 
+                                   nil nil cached)]
       (is (true? (n/changed? handler)))))
   
   (testing "PageHandler implements Handler protocol correctly"
@@ -87,7 +87,7 @@
           items {"slug1" {:changed? false} "slug2" {:changed? false}}
           cached {:target-crc 777 :items-hash 123}
           handler (n/->PageHandler config 1 ["slug1" "slug2"] items 
-                                   (io/file "page.html") 123 777 cached)]
+                                   {:file (io/file "page.html") :crc 777} 123 cached)]
       (is (= 1 (n/id handler)))
       (is (false? (n/changed? handler)))))
   
@@ -96,7 +96,7 @@
           items {"slug1" {:changed? false}}
           cached {:target-crc 777 :items-hash 123}
           handler (n/->FeedHandler config "atom" ["slug1"] items 
-                                   (io/file "atom.xml") 123 777 cached)]
+                                   {:file (io/file "atom.xml") :crc 777} 123 cached)]
       (is (= "atom" (n/id handler)))
       (is (false? (n/changed? handler))))))
 
@@ -118,17 +118,15 @@
           slug "note-a"
           count 5
           template :note-template
-          source-file (io/file "note-a.md")
-          target-file (io/file "note-a.html")
-          source-crc 123
-          target-crc 456
+          source {:file (io/file "note-a.md") :crc 123}
+          target {:file (io/file "note-a.html") :crc 456}
           
           ;; Cached item has specific prev/next links
           cached {:source-crc 123
                   :target-crc 456
                   :count 5}
           
-          handler (n/->ItemHandler config slug count template source-file target-file source-crc target-crc nil nil cached)]
+          handler (n/->ItemHandler config slug count template source target nil nil cached)]
       
       (testing "handler reports no change when all cache values match"
         (is (false? (n/changed? handler))
@@ -136,15 +134,15 @@
       
       (testing "handler can detect prev/next link changes"
         ;; Test that ItemHandler correctly detects when prev/next links change
-        (let [handler-with-different-prev (n/->ItemHandler config slug count template source-file target-file source-crc target-crc "different-prev" nil cached)
-              handler-with-different-next (n/->ItemHandler config slug count template source-file target-file source-crc target-crc nil "different-next" cached)]
+        (let [handler-with-different-prev (n/->ItemHandler config slug count template source target "different-prev" nil cached)
+              handler-with-different-next (n/->ItemHandler config slug count template source target nil "different-next" cached)]
           (is (true? (n/changed? handler-with-different-prev))
               "Handler should detect change when prev link differs from cache")
           (is (true? (n/changed? handler-with-different-next))
               "Handler should detect change when next link differs from cache")))
       
       (testing "handler stores prev/next in cache"
-        (let [handler-with-links (n/->ItemHandler config slug count template source-file target-file source-crc target-crc "prev-slug" "next-slug" cached)
+        (let [handler-with-links (n/->ItemHandler config slug count template source target "prev-slug" "next-slug" cached)
               populated (n/populate handler-with-links {:title "Test"})]
           (is (= "prev-slug" (:prev populated))
               "Populated data should include prev link")
