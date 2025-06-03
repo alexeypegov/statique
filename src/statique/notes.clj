@@ -14,6 +14,12 @@
 (defn- notes-dir [cfg] (with-general cfg :notes-dir))
 (defn- output-dir [cfg] (with-general cfg :output-dir))
 
+(defn- render-context
+  [config props & kvs]
+  (-> props
+      (assoc :vars (:vars config))
+      (merge (apply hash-map kvs))))
+
 (defn- page-filename
   [config index]
   (let [index-name   (with-general config :index-page-name)
@@ -28,15 +34,6 @@
        vals
        (some :changed?)
        true?))
-
-(defn- render-item
-  [props config renderer template transformed]
-  (let [tpl  (with-general config template)
-        vars (:vars config)]
-    (->> (assoc props :vars vars)
-         (merge transformed)
-         (renderer tpl)
-         u/check-render-error)))
 
 (defn item-transform
   [transformer type source-file slug]
@@ -77,7 +74,11 @@
   (transform [_ transformer]
     (item-transform transformer :relative source-file slug))
   (render [_ props renderer transformed]
-    (render-item props config renderer template transformed)))
+    (let [tpl (with-general config template)]
+      (->> (render-context config props)
+           (merge transformed)
+           (renderer tpl)
+           u/check-render-error))))
 
 (deftype PageHandler [config index slugs items target-file items-hash target-crc cached]
   Handler
@@ -94,17 +95,15 @@
     (map #(:transformed (get items %)) slugs))
   (render [_ props renderer transformed]
     (let [template  (with-general config :page-template)
-          vars      (:vars config)
           index     (:index props)
           next?     (:next? props)
           next-page (when next? (page-filename config (inc index)))
           prev-page (when (> index 1) (page-filename config (dec index)))]
-      (->> (assoc props
-                  :ndx       index
-                  :next-page next-page
-                  :prev-page prev-page
-                  :vars      vars
-                  :items     transformed)
+      (->> (render-context config props
+                           :ndx       index
+                           :next-page next-page
+                           :prev-page prev-page
+                           :items     transformed)
            (renderer template)
            u/check-render-error))))
 
@@ -128,12 +127,10 @@
                   (transform source-file slug)))]
         (map tr slugs))))
   (render [_ props renderer transformed]
-    (let [base-url (with-general config :base-url)
-          vars     (:vars config)]
-      (->> (assoc props
-                  :items    transformed
-                  :base-url base-url
-                  :vars     vars)
+    (let [base-url (with-general config :base-url)]
+      (->> (render-context config props
+                           :items    transformed
+                           :base-url base-url)
            (renderer name)
            u/check-render-error))))
 
