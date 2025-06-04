@@ -21,8 +21,7 @@
 
 (defn- transformer
   [config noembed type object]
-  (let [notes-dir (cfg/with-general config :notes-dir)
-        base-url  (cfg/with-general config :base-url)]
+  (let [[notes-dir base-url] (cfg/get-generals config :notes-dir :base-url)]
     (as->
      (condp = type
        :absolute (conj md/default-extensions (r/media-extension noembed notes-dir base-url))
@@ -36,7 +35,7 @@
 
 (defn- mk-renderer
   [config]
-  (some->> (cfg/with-general config :theme-dir)
+  (some->> (cfg/get-general config :theme-dir)
            (u/validate-dir)
            (fm/make-config)
            (partial fm/render)))

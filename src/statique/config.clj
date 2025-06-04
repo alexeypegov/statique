@@ -53,14 +53,17 @@
       (append-statique-vars)
       (assoc-in [:general :root-dir] working-dir)))
 
-(defn with-general
+(defn get-general
   [cfg & keys]
   (->> (conj keys :general)
        (get-in cfg)))
 
+(defn get-generals [cfg & keys]
+  (mapv #(get-general cfg %) keys))
+
 (defn get-cache-file
   [cfg name]
-  (let [dir       (with-general cfg :cache-dir)
+  (let [dir       (get-general cfg :cache-dir)
         filename  (format "%s.edn" name)]
     (fs/file dir filename)))
 

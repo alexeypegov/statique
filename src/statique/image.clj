@@ -78,18 +78,18 @@
 (defn- process-jpeg
   [is]
   (some-> is
-    (check [0xd8 0xFF])
-    (find-jpeg-frame [0xc0, 0xc1, 0xc2])
-    (skip 3)
-    (read-two-ints be 2)
-    reverse))
+          (check [0xd8 0xFF])
+          (find-jpeg-frame [0xc0, 0xc1, 0xc2])
+          (skip 3)
+          (read-two-ints be 2)
+          reverse))
 
 (defn- process-gif
   [is]
   (some-> is
-    (check "IF8")
-    (skip 2)
-    (read-two-ints le 2)))
+          (check "IF8")
+          (skip 2)
+          (read-two-ints le 2)))
 
 (defmulti read-webp-dimensions (fn [in] (read-str in 4)))
 (defmethod read-webp-dimensions "VP8 " [is]
@@ -122,19 +122,19 @@
 (defn- process-webp
   [is]
   (some-> is
-    (check "IFF")
-    (skip 4)
-    (check "WEBP")
-    (read-webp-dimensions)))
+          (check "IFF")
+          (skip 4)
+          (check "WEBP")
+          (read-webp-dimensions)))
 
 (defn get-dimensions
   [filepath]
-    (with-open [is (input-stream (file filepath))]
-      (let [first-byte (.read is)]
-        (case first-byte
-          0x89 (process-png is)
-          0xFF (process-jpeg is)
-          0x47 (process-gif is)
-          0x52 (process-webp is)
-          nil))))
+  (with-open [is (input-stream (file filepath))]
+    (let [first-byte (.read is)]
+      (case first-byte
+        0x89 (process-png is)
+        0xFF (process-jpeg is)
+        0x47 (process-gif is)
+        0x52 (process-webp is)
+        nil))))
 

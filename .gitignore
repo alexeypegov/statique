@@ -11,7 +11,7 @@ pom.xml.asc
 .clj-kondo/*
 !.clj-kondo/config.edn
 !.clj-kondo/hooks
-.lsp
+.lsp/.cache
 bin/
 example/out
 example/cache

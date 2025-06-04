@@ -1,6 +1,6 @@
 (ns statique.notes
   (:require [statique.items :refer [item-seq]]
-            [statique.config :refer [with-general]]
+            [statique.config :refer [get-general get-generals]]
             [statique.util :as u]
             [clojure.tools.logging :as log]
             [me.raynes.fs :as fs]
@@ -11,8 +11,8 @@
 (def ^:private md-ext           ".md")
 (def ^:private xml-ext          ".xml")
 
-(defn- notes-dir [cfg] (with-general cfg :notes-dir))
-(defn- output-dir [cfg] (with-general cfg :output-dir))
+(defn- notes-dir [cfg] (get-general cfg :notes-dir))
+(defn- output-dir [cfg] (get-general cfg :output-dir))
 
 (defn- file-with-crc
   [dir filename]
@@ -27,8 +27,7 @@
 
 (defn- page-filename
   [config index]
-  (let [index-name   (with-general config :index-page-name)
-        page-prefix  (with-general config :page-prefix)]
+  (let [[index-name page-prefix] (get-generals config :index-page-name :page-prefix)]
     (if (= index 1)
       (str index-name html-ext)
       (str page-prefix index html-ext))))
@@ -79,7 +78,7 @@
   (transform [_ transformer]
     (item-transform transformer :relative (:file source) slug))
   (render [_ props renderer transformed]
-    (let [tpl (with-general config template)]
+    (let [tpl (get-general config template)]
       (->> (render-context config props)
            (merge transformed)
            (renderer tpl)
@@ -99,7 +98,7 @@
   (transform [_ _]
     (map #(:transformed (get items %)) slugs))
   (render [_ props renderer transformed]
-    (let [template  (with-general config :page-template)
+    (let [template  (get-general config :page-template)
           index     (:index props)
           next?     (:next? props)
           next-page (when next? (page-filename config (inc index)))
@@ -126,13 +125,13 @@
   (transform [_ transformer]
     (let [transform (partial item-transform transformer :absolute)]
       (letfn [(tr [slug]
-                (let [notes-dir   (notes-dir config)
-                      filename    (str slug md-ext)
-                      source-file (fs/file notes-dir filename)]
-                  (transform source-file slug)))]
+                  (let [notes-dir   (notes-dir config)
+                        filename    (str slug md-ext)
+                        source-file (fs/file notes-dir filename)]
+                    (transform source-file slug)))]
         (map tr slugs))))
   (render [_ props renderer transformed]
-    (let [base-url (with-general config :base-url)]
+    (let [base-url (get-general config :base-url)]
       (->> (render-context config props
                            :items    transformed
                            :base-url base-url)
@@ -179,7 +178,7 @@
 
 (defmethod mk-handler :single [ctx item items]
   (u/with-context ctx [config]
-    (let [singles-dir (with-general config :singles-dir)
+    (let [singles-dir (get-general config :singles-dir)
           output-dir  (output-dir config)
           slug        (:slug item)
           source      (file-with-crc singles-dir (str slug md-ext))
@@ -215,7 +214,7 @@
 
 (defmethod process :feed [ctx items-cache {slugs :items}]
   (u/with-context ctx [config]
-    (let [feeds (with-general config :feeds)
+    (let [feeds (get-general config :feeds)
           proc  (partial process-item ctx)]
       (->> (map #(assoc {}
                         :type :feed
@@ -242,19 +241,18 @@
      coll)))
 
 (u/defnc generate-notes [config] [items-cache]
-  (when-let [notes-dir (u/validate-dir (with-general config :notes-dir))]
-    (let [page-size    (with-general config :notes-per-page)
-          feed-size    (with-general config :items-per-feed)
-          files        (reverse (u/sorted-files notes-dir markdown-filter))
-          slugs        (map u/slug files)
-          proc         (partial process $ctx)
-          pageless     (= page-size 0)]
+  (when-let [notes-dir (u/validate-dir (get-general config :notes-dir))]
+    (let [[page-size feed-size]   (get-generals config :notes-per-page :items-per-feed)
+          files                   (reverse (u/sorted-files notes-dir markdown-filter))
+          slugs                   (map u/slug files)
+          proc                    (partial process $ctx)
+          pageless                (= page-size 0)]
       (->> (item-seq page-size feed-size slugs)
            (prev-next pageless)
            (reduce proc items-cache)))))
 
 (u/defnc generate-singles [config] [items-cache]
-  (let [singles-dir (with-general config :singles-dir)
+  (let [singles-dir (get-general config :singles-dir)
         files       (u/list-files singles-dir markdown-filter)
         slugs       (map u/slug files)
         proc        (partial process $ctx)]
@@ -265,7 +263,7 @@
 (defmethod sitemap-item :page [_ _] nil)
 (defmethod sitemap-item :feed [_ _] nil)
 (defmethod sitemap-item :default [config props]
-  (let [base-url     (with-general config :base-url)
+  (let [base-url     (get-general config :base-url)
         transformed  (:transformed props)]
     (assoc transformed
            :loc (str base-url (:slug transformed) html-ext))))

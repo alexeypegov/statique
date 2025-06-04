@@ -19,13 +19,13 @@
 
 (def ^:private media-services ["youtube.com" "youtu.be" "vimeo.com" "coub.com"])
 
-(defn- url? 
+(defn- url?
   [s]
   (or
    (s/starts-with? s "http://")
    (s/starts-with? s "https://")))
 
-(defn- get-host 
+(defn- get-host
   [text]
   (when (url? text)
     (.getHost (java.net.URL. text))))

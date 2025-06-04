@@ -5,7 +5,7 @@
 
 (def ^:private noembed-url "http://noembed.com/embed")
 
-(defn fetch 
+(defn fetch
   "Fetches noembed data for the given media URL"
   [url]
   (let [options              {:query-params {:url url :timeout 1000}}
@@ -15,9 +15,9 @@
         (json/read-str body :key-fn keyword)
         (catch Throwable e
           (log/warn url (.getMessage e) body)
-          {:error (.getMessage e) 
+          {:error (.getMessage e)
            :url   url}))
-      (do 
+      (do
         (log/warn url)
         {:error url
          :url   url}))))

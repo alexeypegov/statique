@@ -1,7 +1,7 @@
 (ns statique.pipeline
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [statique.config :as cfg]
+            [statique.config :refer [get-general get-cache dump-cache]]
             [statique.notes :as notes]
             [statique.static :as static]
             [statique.util :as u]))
@@ -24,7 +24,7 @@
   (execute [_ context _state]
     (log/debug "Loading content...")
     (u/with-context context [config]
-      (let [items-cache (cfg/get-cache config "items")
+      (let [items-cache (get-cache config "items")
             ctx (select-keys context [:reporter :config :renderer :noembed :transformer])]
         (as-> items-cache $
           (notes/generate-notes ctx $)
@@ -51,7 +51,7 @@
   (execute [_ context state]
     (log/debug "Copying index if needed...")
     (u/with-context context [config]
-      (when (cfg/with-general config :copy-last-as-index)
+      (when (get-general config :copy-last-as-index)
         (when-let [last-item (->> (vals state)
                                   (filter #(= :item (:type %)))
                                   (sort #(compare
@@ -72,9 +72,9 @@
   (execute [_ context state]
     (log/debug "Generating sitemap...")
     (u/with-context context [config renderer]
-      (when-let [template (cfg/with-general config :sitemap-template)]
+      (when-let [template (get-general config :sitemap-template)]
         (let [sitemap-item (partial notes/sitemap-item config)
-              output-dir (cfg/with-general config :output-dir)
+              output-dir (get-general config :output-dir)
               target-file (io/file output-dir "sitemap.xml")]
           (log/info "Writing sitemap.xml")
           (->> {:items (filter some? (map sitemap-item (vals state)))}
@@ -95,9 +95,9 @@
   PipelineStage
   (execute [_ _context state]
     (log/debug "Preparing cache...")
-    (reduce (fn [r [k v]] 
-              (assoc r k (dissoc v :rendered :target-file :changed?))) 
-            {} 
+    (reduce (fn [r [k v]]
+              (assoc r k (dissoc v :rendered :target-file :changed?)))
+            {}
             state)))
 
 (defrecord WriteCacheStage []
@@ -105,8 +105,8 @@
   (execute [_ context state]
     (log/debug "Writing caches...")
     (u/with-context context [config noembed]
-      (cfg/dump-cache config "items" state)
-      (cfg/dump-cache config "noembed" (noembed :all)))
+      (dump-cache config "items" state)
+      (dump-cache config "noembed" (noembed :all)))
     state))
 
 ;; Default Pipeline

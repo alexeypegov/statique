@@ -1,7 +1,7 @@
 (ns statique.static
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
-            [statique.config :refer [with-general]]
+            [statique.config :refer [get-generals]]
             [me.raynes.fs :as fs]))
 
 (defn- copy-file
@@ -17,8 +17,7 @@
 
 (defn copy
   [config]
-  (let [output-dir (with-general config :output-dir)
-        copy       (with-general config :copy)]
+  (let [[output-dir copy] (get-generals config :output-dir :copy)]
     (letfn [(do-copy [item] (when (fs/exists? item)
                               (if (fs/directory? item)
                                 (copy-dir item output-dir)

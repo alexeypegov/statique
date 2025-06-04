@@ -10,19 +10,19 @@
 
 (defn setup [f]
   (with-redefs [cfg/with-general (fn [_config key]
-                                     (get {:notes-dir        "notes/"
-                                           :output-dir       (io/file working-dir "out/")
-                                           :singles-dir      "singles/"
-                                           :index-page-name  "index"
-                                           :page-prefix      "page-"
-                                           :note-template    "note"
-                                           :page-template    "page"
-                                           :single-template  "single"
-                                           :base-url         "/"
-                                           :notes-per-page   10
-                                           :items-per-feed   10
-                                           :feeds            ["atom"]
-                                           :vars             {}} key))
+                                   (get {:notes-dir        "notes/"
+                                         :output-dir       (io/file working-dir "out/")
+                                         :singles-dir      "singles/"
+                                         :index-page-name  "index"
+                                         :page-prefix      "page-"
+                                         :note-template    "note"
+                                         :page-template    "page"
+                                         :single-template  "single"
+                                         :base-url         "/"
+                                         :notes-per-page   10
+                                         :items-per-feed   10
+                                         :feeds            ["atom"]
+                                         :vars             {}} key))
                 u/crc32           (constantly 777)
                 u/validate-dir    identity
                 u/sorted-files    (constantly [])
@@ -64,38 +64,38 @@
   (testing "ItemHandler implements Handler protocol correctly"
     (let [config {}
           cached {:source-crc 777 :target-crc 777 :count 5}
-          handler (n/->ItemHandler config "test-slug" 5 :note-template 
-                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777} 
+          handler (n/->ItemHandler config "test-slug" 5 :note-template
+                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777}
                                    nil nil cached)]
       (is (= "test-slug" (n/id handler)))
       (is (false? (n/changed? handler)))
-      
+
       (let [populated (n/populate handler {:title "Test"})]
         (is (= 777 (:source-crc populated)))
         (is (= 5 (:count populated))))))
-  
+
   (testing "ItemHandler detects changes correctly"
     (let [config {}
           cached {:source-crc 555 :target-crc 777 :count 5}  ; Different source CRC
-          handler (n/->ItemHandler config "test-slug" 5 :note-template 
-                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777} 
+          handler (n/->ItemHandler config "test-slug" 5 :note-template
+                                   {:file (io/file "source.md") :crc 777} {:file (io/file "target.html") :crc 777}
                                    nil nil cached)]
       (is (true? (n/changed? handler)))))
-  
+
   (testing "PageHandler implements Handler protocol correctly"
     (let [config {}
           items {"slug1" {:changed? false} "slug2" {:changed? false}}
           cached {:target-crc 777 :items-hash 123}
-          handler (n/->PageHandler config 1 ["slug1" "slug2"] items 
+          handler (n/->PageHandler config 1 ["slug1" "slug2"] items
                                    {:file (io/file "page.html") :crc 777} 123 cached)]
       (is (= 1 (n/id handler)))
       (is (false? (n/changed? handler)))))
-  
+
   (testing "FeedHandler implements Handler protocol correctly"
     (let [config {}
           items {"slug1" {:changed? false}}
           cached {:target-crc 777 :items-hash 123}
-          handler (n/->FeedHandler config "atom" ["slug1"] items 
+          handler (n/->FeedHandler config "atom" ["slug1"] items
                                    {:file (io/file "atom.xml") :crc 777} 123 cached)]
       (is (= "atom" (n/id handler)))
       (is (false? (n/changed? handler))))))
@@ -105,11 +105,11 @@
     (let [config {}]
       (is (nil? (n/sitemap-item config {:type :page})))
       (is (nil? (n/sitemap-item config {:type :feed})))))
-  
+
   (testing "sitemap-item creates sitemap entry for items"
     (let [config {}
           props {:type :item :transformed {:slug "test-post"}}]
-      (is (= {:slug "test-post" :loc "/test-post.html"} 
+      (is (= {:slug "test-post" :loc "/test-post.html"}
              (n/sitemap-item config props))))))
 
 (deftest prev-next-link-change-detection-test
@@ -120,18 +120,18 @@
           template :note-template
           source {:file (io/file "note-a.md") :crc 123}
           target {:file (io/file "note-a.html") :crc 456}
-          
+
           ;; Cached item has specific prev/next links
           cached {:source-crc 123
                   :target-crc 456
                   :count 5}
-          
+
           handler (n/->ItemHandler config slug count template source target nil nil cached)]
-      
+
       (testing "handler reports no change when all cache values match"
         (is (false? (n/changed? handler))
             "Handler should not report change when source-crc, target-crc, count are same"))
-      
+
       (testing "handler can detect prev/next link changes"
         ;; Test that ItemHandler correctly detects when prev/next links change
         (let [handler-with-different-prev (n/->ItemHandler config slug count template source target "different-prev" nil cached)
@@ -140,7 +140,7 @@
               "Handler should detect change when prev link differs from cache")
           (is (true? (n/changed? handler-with-different-next))
               "Handler should detect change when next link differs from cache")))
-      
+
       (testing "handler stores prev/next in cache"
         (let [handler-with-links (n/->ItemHandler config slug count template source target "prev-slug" "next-slug" cached)
               populated (n/populate handler-with-links {:title "Test"})]

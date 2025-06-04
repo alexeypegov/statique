@@ -23,7 +23,7 @@
   (testing "CopyIndexStage returns state unchanged"
     (let [stage (pipeline/->CopyIndexStage)
           context (pipeline/create-context {:general {:copy-last-as-index false}} nil nil nil nil)
-          state {"item1" {:type :item :changed? true :target-file (java.io.File. "2020-01-01-first.html") 
+          state {"item1" {:type :item :changed? true :target-file (java.io.File. "2020-01-01-first.html")
                           :transformed {:slug "2020-01-01-first"} :rendered "content1"}}]
       (with-redefs [u/write-file (fn [_file _data] nil)]  ; Mock to prevent actual file writes
         (let [result (pipeline/execute stage context state)]
@@ -35,10 +35,10 @@
           state {"key" {:source-crc 123 :rendered "html" :target-file "file.html" :changed? true :other-key "value"}}
           result (pipeline/execute stage nil state)]
       (is (= {"key" {:source-crc 123 :other-key "value"}} result))))
-  
+
   (testing "PrepareCacheStage preserves prev/next links"
     (let [stage (pipeline/->PrepareCacheStage)
-          state {"note1" {:source-crc 123 :rendered "html" :target-file "file.html" :changed? true 
+          state {"note1" {:source-crc 123 :rendered "html" :target-file "file.html" :changed? true
                           :prev "note0" :next "note2" :count 5 :type :item}}
           result (pipeline/execute stage nil state)]
       (is (= {"note1" {:source-crc 123 :prev "note0" :next "note2" :count 5 :type :item}} result)
