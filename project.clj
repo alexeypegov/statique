@@ -8,6 +8,7 @@
                  [org.freemarker/freemarker "2.3.34"]
                  [me.raynes/fs "1.4.6"]
                  [org.clojure/tools.logging "1.3.0"]
+                 [org.clojure/tools.cli "1.1.230"]
                  [ch.qos.logback/logback-classic "1.5.18"]
                  [org.commonmark/commonmark "0.24.0"]
                  [org.commonmark/commonmark-ext-yaml-front-matter "0.24.0"]

@@ -45,13 +45,14 @@
        (assoc config :vars)))
 
 (defn mk-config
-  [working-dir]
-  (-> (io/file working-dir config-name)
-      (yaml/from-file convert-to-symbols)
-      (with-defaults)
-      (map-general-dirs working-dir)
-      (append-statique-vars)
-      (assoc-in [:general :root-dir] working-dir)))
+  ([working-dir] (mk-config working-dir config-name))
+  ([working-dir config-filename]
+   (-> (io/file working-dir config-filename)
+       (yaml/from-file convert-to-symbols)
+       (with-defaults)
+       (map-general-dirs working-dir)
+       (append-statique-vars)
+       (assoc-in [:general :root-dir] working-dir))))
 
 (defn get-general
   [cfg & keys]
@@ -68,8 +69,11 @@
     (fs/file dir filename)))
 
 (defn get-cache
-  [cfg name]
-  (u/read-edn (get-cache-file cfg name)))
+  ([cfg name] (get-cache cfg name false))
+  ([cfg name ignore-cache?]
+   (if ignore-cache?
+     {}
+     (u/read-edn (get-cache-file cfg name)))))
 
 (defn dump-cache
   [cfg name data]

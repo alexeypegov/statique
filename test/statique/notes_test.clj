@@ -9,20 +9,20 @@
 (def ^:private working-dir (io/file "/working-dir/"))
 
 (defn setup [f]
-  (with-redefs [cfg/with-general (fn [_config key]
-                                   (get {:notes-dir        "notes/"
-                                         :output-dir       (io/file working-dir "out/")
-                                         :singles-dir      "singles/"
-                                         :index-page-name  "index"
-                                         :page-prefix      "page-"
-                                         :note-template    "note"
-                                         :page-template    "page"
-                                         :single-template  "single"
-                                         :base-url         "/"
-                                         :notes-per-page   10
-                                         :items-per-feed   10
-                                         :feeds            ["atom"]
-                                         :vars             {}} key))
+  (with-redefs [cfg/get-general (fn [_config key]
+                                  (get {:notes-dir        "notes/"
+                                        :output-dir       (io/file working-dir "out/")
+                                        :singles-dir      "singles/"
+                                        :index-page-name  "index"
+                                        :page-prefix      "page-"
+                                        :note-template    "note"
+                                        :page-template    "page"
+                                        :single-template  "single"
+                                        :base-url         "/"
+                                        :notes-per-page   10
+                                        :items-per-feed   10
+                                        :feeds            ["atom"]
+                                        :vars             {}} key))
                 u/crc32           (constantly 777)
                 u/validate-dir    identity
                 u/sorted-files    (constantly [])

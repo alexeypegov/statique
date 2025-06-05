@@ -1,6 +1,7 @@
 (ns statique.core
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [clojure.tools.cli :as cli]
             [statique.util :as u]
             [statique.freemarker :as fm]
             [statique.markdown.noembed :as noembed]
@@ -12,12 +13,20 @@
 
 (def ^:private working-dir (u/working-dir))
 
+(def cli-options
+  [["-d" "--debug" "Enable debug output"]
+   ["-n" "--no-cache" "Ignore items cache (force regeneration)"]
+   ["-c" "--config PATH" "Path to config file"
+    :default "blog.yaml"]
+   ["-h" "--help" "Show help"]])
+
 (defn- blog-dir?
-  [path]
-  (let [file (io/as-file path)]
-    (and
-     (.isDirectory file)
-     (.exists (io/file path cfg/config-name)))))
+  ([path] (blog-dir? path cfg/config-name))
+  ([path config-name]
+   (let [file (io/as-file path)]
+     (and
+      (.isDirectory file)
+      (.exists (io/file path config-name))))))
 
 (defn- transformer
   [config noembed type object]
@@ -50,16 +59,55 @@
 (defmethod reporter [:render :single] [_ name]
   (println "Rendering single page:" name))
 
-(defn -main
+(defn- set-debug-logging!
   []
-  (log/info "Statique" cfg/app-version)
-  (if (blog-dir? working-dir)
-    (let [[_ total-time] (u/timed
-                          (let [config      (cfg/mk-config working-dir)
-                                noembed     (mk-noembed-cache config)
-                                transformer (partial transformer config noembed)
-                                renderer    (mk-renderer config)]
-                            (pipeline/build-site config noembed transformer renderer reporter)))]
-      (log/info "Generation completed in" (u/format-time total-time))
-      (flush))
-    (log/error "Unable to find config file (" cfg/config-name ") at:" (.getAbsolutePath working-dir))))
+  (-> (org.slf4j.LoggerFactory/getLogger org.slf4j.Logger/ROOT_LOGGER_NAME)
+      (.setLevel ch.qos.logback.classic.Level/DEBUG)))
+
+(defn- show-help
+  [options-summary]
+  (println "Statique - Static site generator")
+  (println)
+  (println "Usage: statique [options]")
+  (println)
+  (println "Options:")
+  (println options-summary))
+
+(defn -main
+  [& args]
+  (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)]
+    (cond
+      (:help options)
+      (show-help summary)
+      
+      errors
+      (do
+        (doseq [error errors]
+          (println "Error:" error))
+        (show-help summary)
+        (System/exit 1))
+      
+      :else
+      (let [config-path (:config options)
+            config-file (io/file config-path)
+            actual-working-dir (if (= config-path "blog.yaml")
+                                 working-dir
+                                 (.getParentFile (io/file config-path)))
+            config-name (.getName config-file)]
+        (when (:debug options)
+          (set-debug-logging!))
+        
+        (log/info "Statique" cfg/app-version)
+        
+        (if (blog-dir? actual-working-dir config-name)
+          (let [[_ total-time] (u/timed
+                                (let [config      (cfg/mk-config actual-working-dir config-name)
+                                      no-cache?   (:no-cache options)
+                                      noembed     (mk-noembed-cache config)
+                                      transformer (partial transformer config noembed)
+                                      renderer    (mk-renderer config)
+                                      options-map {:no-cache no-cache?}]
+                                  (pipeline/build-site config noembed transformer renderer reporter options-map)))]
+            (log/info "Generation completed in" (u/format-time total-time))
+            (flush))
+          (log/error "Unable to find config file (" config-name ") at:" (.getAbsolutePath actual-working-dir)))))))

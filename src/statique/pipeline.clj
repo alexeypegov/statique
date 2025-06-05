@@ -7,12 +7,14 @@
             [statique.util :as u]))
 
 ;; Pipeline Context
-(defrecord PipelineContext [config noembed transformer renderer reporter])
+(defrecord PipelineContext [config noembed transformer renderer reporter options])
 
 (defn create-context
   "Creates the pipeline context with all necessary dependencies"
-  [config noembed transformer renderer reporter]
-  (->PipelineContext config noembed transformer renderer reporter))
+  ([config noembed transformer renderer reporter]
+   (create-context config noembed transformer renderer reporter {}))
+  ([config noembed transformer renderer reporter options]
+   (->PipelineContext config noembed transformer renderer reporter options)))
 
 ;; Pipeline Stages
 (defprotocol PipelineStage
@@ -23,8 +25,9 @@
   PipelineStage
   (execute [_ context _state]
     (log/debug "Loading content...")
-    (u/with-context context [config]
-      (let [items-cache (get-cache config "items")
+    (u/with-context context [config options]
+      (let [ignore-cache? (:no-cache options)
+            items-cache (get-cache config "items" ignore-cache?)
             ctx (select-keys context [:reporter :config :renderer :noembed :transformer])]
         (as-> items-cache $
           (notes/generate-notes ctx $)
@@ -73,14 +76,21 @@
     (log/debug "Generating sitemap...")
     (u/with-context context [config renderer]
       (when-let [template (get-general config :sitemap-template)]
-        (let [sitemap-item (partial notes/sitemap-item config)
-              output-dir (get-general config :output-dir)
-              target-file (io/file output-dir "sitemap.xml")]
-          (log/info "Writing sitemap.xml")
-          (->> {:items (filter some? (map sitemap-item (vals state)))}
-               (renderer template)
-               u/check-render-error
-               (u/write-file target-file)))))
+        (when-let [changed-items (seq (filter :changed? (vals state)))]
+          (let [sitemap-item (partial notes/sitemap-item config)
+                output-dir (get-general config :output-dir)
+                target-file (io/file output-dir "sitemap.xml")
+                sitemap-items (filter some? (map sitemap-item (vals state)))
+                most-recent-date (->> sitemap-items
+                                      (map #(or (:updated %) (:date %)))
+                                      (filter some?)
+                                      (sort)
+                                      (last))]
+            (log/info "Writing sitemap.xml")
+            (->> {:items sitemap-items :most-recent-date most-recent-date}
+                 (renderer template)
+                 u/check-render-error
+                 (u/write-file target-file))))))
     state))
 
 (defrecord CopyStaticStage []
@@ -133,6 +143,8 @@
 ;; Main pipeline function
 (defn build-site
   "Main function to build the static site"
-  [config noembed transformer renderer reporter]
-  (let [context (create-context config noembed transformer renderer reporter)]
-    (run-pipeline context)))
+  ([config noembed transformer renderer reporter]
+   (build-site config noembed transformer renderer reporter {}))
+  ([config noembed transformer renderer reporter options]
+   (let [context (create-context config noembed transformer renderer reporter options)]
+     (run-pipeline context))))

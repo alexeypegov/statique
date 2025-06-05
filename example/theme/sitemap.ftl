@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>http://www.example.com/</loc>
-    <lastmod>${.now?string["yyyy-MM-dd"]}</lastmod>
+    <lastmod>${most_recent_date!"2020-01-01"}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

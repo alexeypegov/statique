@@ -28,6 +28,13 @@ See `example` directory or [my own blog][own]
 
 Run `statique` in a directory with `blog.yaml`
 
+### Command Line Options
+
+- `-d, --debug` - Enable debug output
+- `-n, --no-cache` - Ignore items cache (force regeneration)  
+- `-c, --config PATH` - Path to config file (default: blog.yaml)
+- `-h, --help` - Show help
+
 ## Make
 
     lein uberjar
