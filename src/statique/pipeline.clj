@@ -76,7 +76,7 @@
     (log/debug "Generating sitemap...")
     (u/with-context context [config renderer]
       (when-let [template (get-general config :sitemap-template)]
-        (when-let [changed-items (seq (filter :changed? (vals state)))]
+        (when-let [_changed-items (seq (filter :changed? (vals state)))]
           (let [sitemap-item (partial notes/sitemap-item config)
                 output-dir (get-general config :output-dir)
                 target-file (io/file output-dir "sitemap.xml")

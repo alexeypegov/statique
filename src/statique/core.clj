@@ -75,7 +75,7 @@
 
 (defn -main
   [& args]
-  (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)]
+  (let [{:keys [options _arguments errors summary]} (cli/parse-opts args cli-options)]
     (cond
       (:help options)
       (show-help summary)
