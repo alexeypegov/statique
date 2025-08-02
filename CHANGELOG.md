@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.62
+
+### Added
+
+- Draft support: Notes (blog posts) now support drafts. Files that don't follow the `YYYY-MM-DD-slug.md` naming format are treated as drafts and ignored during generation
+
+### Changed
+
+- Improved CLI: Enhanced command line arguments handling
+
+### Fixed
+
+- Fixed issues with sitemap.xml generation 
+- Fixed prev/next link update bugs
+
+## 0.61
+
+### Changed
+
+- Updated to Clojure 1.12.0
+- Switched to `clojure.tools.logging` for better logging
+- Performance improvements with measurement capabilities
+- Code refactoring for better maintainability
+- Updated dependencies to latest versions
+
+### Fixed
+
+- Fixed prev/next link update bug
+
+## 0.60
+
+### Changed
+
+- Updated to Clojure 1.11.1 
+- Updated clojure.java-time to 1.2.0
+- Added WebP and JPEG image support via TwelveMonkeys ImageIO
+- Replaced lein-binplus with lein-ancient plugin
+
 ## 0.59
 
 ### Fixed

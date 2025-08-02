@@ -22,7 +22,13 @@ Static site/blog generator written in Clojure
 
 ## Version
 
-0.61
+0.62
+
+### What's New in 0.62
+
+- **Draft support**: Notes (blog posts) now support drafts. Files that don't follow the `YYYY-MM-DD-slug.md` naming format are treated as drafts and ignored during generation
+- **Improved CLI**: Enhanced command line arguments handling  
+- **Bug fixes**: Fixed issues with sitemap.xml generation and prev/next link updates
 
 ## Examples
 
