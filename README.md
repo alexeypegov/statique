@@ -2,6 +2,10 @@
 
 Static site/blog generator written in Clojure
 
+# Examples
+
+[Ложное движение][ld] — my own blog (in Russian)
+
 ## Features
 
 - Posts and standalone pages in [Markdown][md] with [YAML metadata][yaml]
@@ -53,3 +57,4 @@ your option) any later version.
 [atom]: https://validator.w3.org/feed/docs/atom.html
 [noembed]: https://noembed.com
 [own]: https://github.com/alexeypegov/pegov.io
+[ld]: https://fm.alexeypegov.com
