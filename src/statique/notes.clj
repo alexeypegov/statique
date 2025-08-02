@@ -7,7 +7,7 @@
             [clj-uuid :as uuid]))
 
 (def ^:private markdown-filter  (u/regex-filter #"[^\.]+\.md"))
-(def ^:private notes-filter  (u/regex-filter #"[\d]{4}\-[\d]{2}\-[\d]{2}\-[^\.]+\.md"))
+(def ^:private notes-filter  (u/regex-filter #"\d[^\.]+\.md"))
 (def ^:private html-ext         ".html")
 (def ^:private md-ext           ".md")
 (def ^:private xml-ext          ".xml")
