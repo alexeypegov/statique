@@ -42,11 +42,11 @@
   [dir name-filter]
   (list-files dir name-filter name-comparator))
 
-(defn postfix-filter
-  "Creates a postfix filename filter for File::listFiles"
-  [^String postfix]
+(defn regex-filter
+  "Creates a RegEx filename filter for File::listFiles"
+  [^java.util.regex.Pattern regex]
   (reify FilenameFilter
-    (accept [_ _ name] (str/ends-with? name postfix))))
+    (accept [_ _ name] (some? (re-matches regex name)))))
 
 (defn read-edn
   "Reads EDN from the given file, returns default object if empty or no file"

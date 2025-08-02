@@ -6,7 +6,8 @@
             [me.raynes.fs :as fs]
             [clj-uuid :as uuid]))
 
-(def ^:private markdown-filter  (u/postfix-filter ".md"))
+(def ^:private markdown-filter  (u/regex-filter #"[^\.]+\.md"))
+(def ^:private notes-filter  (u/regex-filter #"[\d]{4}\-[\d]{2}\-[\d]{2}\-[^\.]+\.md"))
 (def ^:private html-ext         ".html")
 (def ^:private md-ext           ".md")
 (def ^:private xml-ext          ".xml")
@@ -243,7 +244,7 @@
 (u/defnc generate-notes [config] [items-cache]
   (when-let [notes-dir (u/validate-dir (get-general config :notes-dir))]
     (let [[page-size feed-size]   (get-generals config :notes-per-page :items-per-feed)
-          files                   (reverse (u/sorted-files notes-dir markdown-filter))
+          files                   (reverse (u/sorted-files notes-dir notes-filter))
           slugs                   (map u/slug files)
           proc                    (partial process $ctx)
           pageless                (= page-size 0)]
