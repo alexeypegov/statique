@@ -28,8 +28,9 @@
 
 (defn- page-filename
   [config index]
-  (let [[index-name page-prefix] (get-generals config :index-page-name :page-prefix)]
-    (if (= index 1)
+  (let [[index-name page-prefix] (get-generals config :index-page-name :page-prefix)
+        first-page-as-index      (get-general config :first-page-as-index)]
+    (if (and (= index 1) first-page-as-index)
       (str index-name html-ext)
       (str page-prefix index html-ext))))
 

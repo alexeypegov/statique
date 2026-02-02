@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63
+
+### Added
+
+- `first-page-as-index` option to control if first page should be named as `index.html` or not (default: `true`).
+
 ## 0.62
 
 ### Added
