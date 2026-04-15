@@ -12,6 +12,9 @@
 (defonce default-extensions
   [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
 
+(defonce ^:private front-matter-extensions
+  [(YamlFrontMatterExtension/create)])
+
 (defn- string->node
   [text extensions]
   (-> (doto (Parser/builder) (.extensions extensions))
@@ -40,7 +43,7 @@
   "Parses only YAML front matter from a file, without rendering HTML body"
   [f]
   (-> (slurp f)
-      (string->node default-extensions)
+      (string->node front-matter-extensions)
       get-metadata))
 
 (defmulti transform (fn [v & _] (type v)))

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.64.1
+
+### Changed
+
+- Performance: `metadata` now parses only the YAML front-matter extension, skipping strikethrough processing
+- Performance: CRC computation skipped for notes not yet in cache when checking deleted status
+
 ## 0.64
 
 ### Added

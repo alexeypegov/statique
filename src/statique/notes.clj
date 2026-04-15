@@ -18,12 +18,12 @@
 
 (defn- deleted-slug?
   [dir items-cache slug]
-  (let [file     (fs/file dir (str slug md-ext))
-        cached   (get items-cache slug)
-        file-crc (u/crc32 file)]
-    (if (= file-crc (:source-crc cached))
-      (boolean (:deleted (:transformed cached)))
-      (boolean (:deleted (md/metadata file))))))
+  (let [cached (get items-cache slug)
+        file   (fs/file dir (str slug md-ext))]
+    (boolean
+      (if (and cached (= (u/crc32 file) (:source-crc cached)))
+        (:deleted (:transformed cached))
+        (:deleted (md/metadata file))))))
 
 (defn- file-with-crc
   [dir filename]
@@ -263,10 +263,10 @@
           proc                    (partial process $ctx)
           pageless                (= page-size 0)]
       (as-> items-cache $
-        (->> (item-seq page-size feed-size (or active-slugs []))
+        (->> (item-seq page-size feed-size active-slugs)
              (prev-next pageless)
              (reduce proc $))
-        (->> (item-seq :item (or deleted-slugs []))
+        (->> (item-seq :item deleted-slugs)
              (reduce proc $))))))
 
 (u/defnc generate-singles [config] [items-cache]
