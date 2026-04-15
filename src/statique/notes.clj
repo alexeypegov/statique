@@ -17,8 +17,8 @@
 (defn- output-dir [cfg] (get-general cfg :output-dir))
 
 (defn- deleted-slug?
-  [notes-dir items-cache slug]
-  (let [file     (fs/file notes-dir (str slug md-ext))
+  [dir items-cache slug]
+  (let [file     (fs/file dir (str slug md-ext))
         cached   (get items-cache slug)
         file-crc (u/crc32 file)]
     (if (= file-crc (:source-crc cached))
@@ -281,8 +281,8 @@
 (defmethod sitemap-item :page [_ _] nil)
 (defmethod sitemap-item :feed [_ _] nil)
 (defmethod sitemap-item :default [config props]
-  (let [transformed (:transformed props)]
+  (let [transformed (:transformed props)
+        base-url    (get-general config :base-url)]
     (when-not (:deleted transformed)
-      (let [base-url (get-general config :base-url)]
-        (assoc transformed
-               :loc (str base-url (:slug transformed) html-ext))))))
+      (assoc transformed
+             :loc (str base-url (:slug transformed) html-ext)))))
