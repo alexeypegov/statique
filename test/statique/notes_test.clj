@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [statique.notes :as n]
             [statique.config :as cfg]
+            [statique.markdown.markdown :as md]
             [statique.util :as u]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [clj-uuid :as uuid]))
@@ -18,6 +19,7 @@
                                         :note-template    "note"
                                         :page-template    "page"
                                         :single-template  "single"
+                                        :first-page-as-index true
                                         :base-url         "/"
                                         :notes-per-page   10
                                         :items-per-feed   10
@@ -100,6 +102,27 @@
       (is (= "atom" (n/id handler)))
       (is (false? (n/changed? handler))))))
 
+(deftest deleted-slug-test
+  (testing "deleted-slug? uses cached value when CRC matches"
+    (let [deleted-cache {"my-post" {:source-crc 777 :transformed {:deleted "outdated"}}}
+          normal-cache  {"my-post" {:source-crc 777 :transformed {:title "Normal"}}}]
+      (is (true?  (#'n/deleted-slug? "notes/" deleted-cache "my-post")))
+      (is (false? (#'n/deleted-slug? "notes/" normal-cache  "my-post")))))
+
+  (testing "deleted-slug? parses front matter when CRC has changed"
+    (with-redefs [md/metadata (constantly {:deleted "reason"})]
+      (is (true? (#'n/deleted-slug? "notes/" {"my-post" {:source-crc 999}} "my-post"))))
+
+    (with-redefs [md/metadata (constantly {:title "Normal"})]
+      (is (false? (#'n/deleted-slug? "notes/" {"my-post" {:source-crc 999}} "my-post")))))
+
+  (testing "deleted-slug? parses front matter when slug not in cache"
+    (with-redefs [md/metadata (constantly {:deleted "reason"})]
+      (is (true? (#'n/deleted-slug? "notes/" {} "my-post"))))
+
+    (with-redefs [md/metadata (constantly {:title "Normal"})]
+      (is (false? (#'n/deleted-slug? "notes/" {} "my-post"))))))
+
 (deftest sitemap-item-test
   (testing "sitemap-item returns nil for pages and feeds"
     (let [config {}]
@@ -110,7 +133,12 @@
     (let [config {}
           props {:type :item :transformed {:slug "test-post"}}]
       (is (= {:slug "test-post" :loc "/test-post.html"}
-             (n/sitemap-item config props))))))
+             (n/sitemap-item config props)))))
+
+  (testing "sitemap-item returns nil for deleted items"
+    (let [config {}
+          props {:type :item :transformed {:slug "old-post" :deleted "outdated content"}}]
+      (is (nil? (n/sitemap-item config props))))))
 
 (deftest prev-next-link-change-detection-test
   (testing "ItemHandler change detection for prev/next links"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.64
+
+### Added
+
+- Deleted note support: add a `Deleted` field to a note's YAML front matter with a reason text. The note will be rendered using a dedicated `deleted` template (default: `deleted.ftl`) instead of the regular note template, and will be excluded from pagination, feeds, prev/next navigation, and sitemap — but remains accessible by direct URL.
+
 ## 0.63
 
 ### Added

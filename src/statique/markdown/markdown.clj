@@ -36,6 +36,13 @@
         (.getData)
         (map-meta-values))))
 
+(defn metadata
+  "Parses only YAML front matter from a file, without rendering HTML body"
+  [f]
+  (-> (slurp f)
+      (string->node default-extensions)
+      get-metadata))
+
 (defmulti transform (fn [v & _] (type v)))
 
 (defmethod transform File

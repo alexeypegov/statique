@@ -1,6 +1,7 @@
 (ns statique.notes
   (:require [statique.items :refer [item-seq]]
             [statique.config :refer [get-general get-generals]]
+            [statique.markdown.markdown :as md]
             [statique.util :as u]
             [clojure.tools.logging :as log]
             [me.raynes.fs :as fs]
@@ -14,6 +15,15 @@
 
 (defn- notes-dir [cfg] (get-general cfg :notes-dir))
 (defn- output-dir [cfg] (get-general cfg :output-dir))
+
+(defn- deleted-slug?
+  [notes-dir items-cache slug]
+  (let [file     (fs/file notes-dir (str slug md-ext))
+        cached   (get items-cache slug)
+        file-crc (u/crc32 file)]
+    (if (= file-crc (:source-crc cached))
+      (boolean (:deleted (:transformed cached)))
+      (boolean (:deleted (md/metadata file))))))
 
 (defn- file-with-crc
   [dir filename]
@@ -80,7 +90,7 @@
   (transform [_ transformer]
     (item-transform transformer :relative (:file source) slug))
   (render [_ props renderer transformed]
-    (let [tpl (get-general config template)]
+    (let [tpl (get-general config (if (:deleted transformed) :deleted-template template))]
       (->> (render-context config props)
            (merge transformed)
            (renderer tpl)
@@ -246,12 +256,18 @@
   (when-let [notes-dir (u/validate-dir (get-general config :notes-dir))]
     (let [[page-size feed-size]   (get-generals config :notes-per-page :items-per-feed)
           files                   (reverse (u/sorted-files notes-dir notes-filter))
-          slugs                   (map u/slug files)
+          all-slugs               (map u/slug files)
+          deleted?                (partial deleted-slug? notes-dir items-cache)
+          {deleted-slugs true
+           active-slugs  false}   (group-by deleted? all-slugs)
           proc                    (partial process $ctx)
           pageless                (= page-size 0)]
-      (->> (item-seq page-size feed-size slugs)
-           (prev-next pageless)
-           (reduce proc items-cache)))))
+      (as-> items-cache $
+        (->> (item-seq page-size feed-size (or active-slugs []))
+             (prev-next pageless)
+             (reduce proc $))
+        (->> (item-seq :item (or deleted-slugs []))
+             (reduce proc $))))))
 
 (u/defnc generate-singles [config] [items-cache]
   (let [singles-dir (get-general config :singles-dir)
@@ -265,7 +281,8 @@
 (defmethod sitemap-item :page [_ _] nil)
 (defmethod sitemap-item :feed [_ _] nil)
 (defmethod sitemap-item :default [config props]
-  (let [base-url     (get-general config :base-url)
-        transformed  (:transformed props)]
-    (assoc transformed
-           :loc (str base-url (:slug transformed) html-ext))))
+  (let [transformed (:transformed props)]
+    (when-not (:deleted transformed)
+      (let [base-url (get-general config :base-url)]
+        (assoc transformed
+               :loc (str base-url (:slug transformed) html-ext))))))

@@ -19,6 +19,7 @@
                                              :index-page-name  			"index"
                                              :page-prefix           "page-"
                                              :single-template  			"single"
+                                             :deleted-template 			"deleted"
                                              :copy-last-as-index    false
                                              :first-page-as-index   true
                                              :sitemap-template      nil

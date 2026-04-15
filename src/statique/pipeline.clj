@@ -57,6 +57,7 @@
       (when (get-general config :copy-last-as-index)
         (when-let [last-item (->> (vals state)
                                   (filter #(= :item (:type %)))
+                                  (filter #(not (:deleted (:transformed %))))
                                   (sort #(compare
                                           (get-in %2 [:transformed :slug])
                                           (get-in %1 [:transformed :slug])))
