@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.64.2
+
+### Changed
+
+- Updated dependencies: Clojure 1.12.4, commonmark 0.28.0, tools.cli 1.4.256, logback 1.5.32, clj-uuid 0.2.5, and minor bumps to tools.logging, http-kit, data.json
+
 ## 0.64.1
 
 ### Changed
