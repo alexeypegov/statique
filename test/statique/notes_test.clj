@@ -102,7 +102,7 @@
       (is (= "atom" (n/id handler)))
       (is (false? (n/changed? handler))))))
 
-(deftest deleted-slug-test
+(deftest ^:eftest/synchronized deleted-slug-test
   (testing "deleted-slug? uses cached value when CRC matches"
     (let [deleted-cache {"my-post" {:source-crc 777 :transformed {:deleted "outdated"}}}
           normal-cache  {"my-post" {:source-crc 777 :transformed {:title "Normal"}}}]
@@ -138,6 +138,11 @@
   (testing "sitemap-item returns nil for deleted items"
     (let [config {}
           props {:type :item :transformed {:slug "old-post" :deleted "outdated content"}}]
+      (is (nil? (n/sitemap-item config props)))))
+
+  (testing "sitemap-item returns nil for draft items"
+    (let [config {}
+          props {:type :item :transformed {:slug "wip-post" :draft "coming soon"}}]
       (is (nil? (n/sitemap-item config props))))))
 
 (deftest prev-next-link-change-detection-test
@@ -176,3 +181,72 @@
               "Populated data should include prev link")
           (is (= "next-slug" (:next populated))
               "Populated data should include next link"))))))
+
+(deftest ^:eftest/synchronized draft-slug-test
+  (testing "draft-slug? uses cached value when CRC matches"
+    (let [draft-cache  {"my-post" {:source-crc 777 :transformed {:draft "WIP"}}}
+          normal-cache {"my-post" {:source-crc 777 :transformed {:title "Normal"}}}]
+      (is (true?  (#'n/draft-slug? "notes/" draft-cache  "my-post")))
+      (is (false? (#'n/draft-slug? "notes/" normal-cache "my-post")))))
+
+  (testing "draft-slug? parses front matter when CRC has changed"
+    (with-redefs [md/metadata (constantly {:draft "WIP"})]
+      (is (true? (#'n/draft-slug? "notes/" {"my-post" {:source-crc 999}} "my-post"))))
+    (with-redefs [md/metadata (constantly {:title "Normal"})]
+      (is (false? (#'n/draft-slug? "notes/" {"my-post" {:source-crc 999}} "my-post")))))
+
+  (testing "draft-slug? parses front matter when slug not in cache"
+    (with-redefs [md/metadata (constantly {:draft "WIP"})]
+      (is (true? (#'n/draft-slug? "notes/" {} "my-post"))))
+    (with-redefs [md/metadata (constantly {:title "Normal"})]
+      (is (false? (#'n/draft-slug? "notes/" {} "my-post"))))))
+
+(defn- without-runtime-keys [cache]
+  (reduce (fn [r [k v]] (assoc r k (dissoc v :rendered :target-file :changed?))) {} cache))
+
+(deftest ^:eftest/synchronized generate-notes-deleted-behavior-test
+  (let [live-a   (io/file "notes/2024-01-03-live-a.md")
+        live-b   (io/file "notes/2024-01-02-live-b.md")
+        deleted  (io/file "notes/2024-01-01-deleted.md")
+        contents {"2024-01-03-live-a"  "# Live A"
+                  "2024-01-02-live-b"  "# Live B"
+                  "2024-01-01-deleted" "---\nDeleted: gone\n---\n# Deleted"}]
+    (with-redefs [cfg/get-general  (fn [_cfg k]
+                                     (get {:notes-dir        "notes/"
+                                           :output-dir       (io/file working-dir "out/")
+                                           :deleted-template "deleted"
+                                           :note-template    "note"
+                                           :page-template    "page"
+                                           :index-page-name  "index"
+                                           :page-prefix      "page-"
+                                           :first-page-as-index true
+                                           :notes-per-page   10
+                                           :items-per-feed   10
+                                           :feeds            ["atom"]
+                                           :base-url         "/"
+                                           :vars             {}} k))
+                  u/sorted-files   (fn [_ _] [deleted live-b live-a])
+                  slurp            (fn [f] (get contents (u/slug f) ""))]
+      (let [page-slugs  (atom nil)
+            render-tpls (atom [])
+            ctx         {:config      {}
+                         :reporter    (fn [& _] nil)
+                         :transformer (fn [_type text] (md/transform text))
+                         :renderer    (fn [tpl render-ctx]
+                                        (when (= "page" tpl)
+                                          (reset! page-slugs (mapv :slug (:items render-ctx))))
+                                        (swap! render-tpls conj tpl)
+                                        {:status :ok :result (str "rendered:" tpl)})}
+            cache1      (n/generate-notes ctx {})]
+
+        (testing "deleted note is excluded from pages"
+          (is (= #{"2024-01-03-live-a" "2024-01-02-live-b"} (set @page-slugs))))
+
+        (testing "deleted note is rendered independently with deleted-template"
+          (is (= "rendered:deleted" (:rendered (get cache1 "2024-01-01-deleted"))))
+          (is (contains? (set @render-tpls) "deleted")))
+
+        (testing "deleted note is not re-rendered on second run when unchanged"
+          (let [disk-cache (without-runtime-keys cache1)
+                cache2     (n/generate-notes ctx disk-cache)]
+            (is (nil? (:changed? (get cache2 "2024-01-01-deleted"))))))))))

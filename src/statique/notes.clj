@@ -16,14 +16,19 @@
 (defn- notes-dir [cfg] (get-general cfg :notes-dir))
 (defn- output-dir [cfg] (get-general cfg :output-dir))
 
-(defn- deleted-slug?
-  [dir items-cache slug]
+(defn- cached-metadata-field
+  [dir items-cache slug field]
   (let [cached (get items-cache slug)
         file   (fs/file dir (str slug md-ext))]
-    (boolean
-      (if (and cached (= (u/crc32 file) (:source-crc cached)))
-        (:deleted (:transformed cached))
-        (:deleted (md/metadata file))))))
+    (if (and cached (= (u/crc32 file) (:source-crc cached)))
+      (get-in cached [:transformed field])
+      (get (md/metadata file) field))))
+
+(defn- deleted-slug? [dir items-cache slug]
+  (boolean (cached-metadata-field dir items-cache slug :deleted)))
+
+(defn- draft-slug? [dir items-cache slug]
+  (boolean (cached-metadata-field dir items-cache slug :draft)))
 
 (defn- file-with-crc
   [dir filename]
@@ -238,6 +243,21 @@
 (defmethod process :single [& args]
   (apply process-item args))
 
+(defmethod process :draft [ctx items-cache item]
+  (u/with-context ctx [config]
+    (let [notes-dir   (notes-dir config)
+          slug        (:slug item)
+          file        (fs/file notes-dir (str slug md-ext))
+          crc         (u/crc32 file)
+          cached      (get items-cache slug)
+          cache-hit?  (and cached (= crc (:source-crc cached)))
+          transformed (if cache-hit? (:transformed cached) (md/metadata file))
+          msg         (:draft transformed)]
+      (log/info (str "Skipping draft: " slug (when (not= "true" msg) (str " - " msg))))
+      (if cache-hit?
+        items-cache
+        (assoc items-cache slug {:source-crc crc :transformed transformed})))))
+
 (defn- prev-next
   [add-cnt coll]
   (let [cnt   (count (filter #(= :item (:type %)) coll))
@@ -258,15 +278,23 @@
           files                   (reverse (u/sorted-files notes-dir notes-filter))
           all-slugs               (map u/slug files)
           deleted?                (partial deleted-slug? notes-dir items-cache)
-          {deleted-slugs true
-           active-slugs  false}   (group-by deleted? all-slugs)
+          draft?                  (partial draft-slug? notes-dir items-cache)
+          {deleted-slugs :deleted
+           draft-slugs   :draft
+           live-slugs    :live}   (group-by #(cond
+                                               (deleted? %) :deleted
+                                               (draft? %)   :draft
+                                               :else        :live)
+                                            all-slugs)
           proc                    (partial process $ctx)
           pageless                (= page-size 0)]
       (as-> items-cache $
-        (->> (item-seq page-size feed-size active-slugs)
+        (->> (item-seq page-size feed-size live-slugs)
              (prev-next pageless)
              (reduce proc $))
         (->> (item-seq :item deleted-slugs)
+             (reduce proc $))
+        (->> (item-seq :draft draft-slugs)
              (reduce proc $))))))
 
 (u/defnc generate-singles [config] [items-cache]
@@ -283,6 +311,6 @@
 (defmethod sitemap-item :default [config props]
   (let [transformed (:transformed props)
         base-url    (get-general config :base-url)]
-    (when-not (:deleted transformed)
+    (when-not (or (:deleted transformed) (:draft transformed))
       (assoc transformed
              :loc (str base-url (:slug transformed) html-ext)))))

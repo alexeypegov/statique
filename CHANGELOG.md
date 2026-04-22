@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.65
+
+### Added
+
+- Draft note support: add a `Draft` field to a note's YAML front matter to exclude it from generated output. Both `Draft: true` and `Draft: <message>` log a skip message at build time including the slug; the latter also appends the provided message. Draft notes are excluded from pagination, feeds, prev/next navigation, sitemap, and index copy — no HTML file is written, though the note is tracked in the items cache for efficiency.
+
+### Changed
+
+- Deleted notes are now also excluded from `copy-last-as-index` (previously only excluded from pagination and sitemap).
+
 ## 0.64.2
 
 ### Changed
