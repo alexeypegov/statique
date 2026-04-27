@@ -45,6 +45,22 @@
 (def ^:private be ba->int-be)
 (def ^:private le (comp ba->int-be reverse))
 
+(defn- read-box-header
+  ([is]
+   (when-let [size (read-int is be 4)]
+     (when-let [box-type (read-str is 4)]
+       {:size size
+        :type box-type
+        :header-size 8})))
+  ([is first-byte]
+   (let [size-bytes (byte-array 4)]
+     (aset-byte size-bytes 0 (unchecked-byte first-byte))
+     (when (= 3 (.read is size-bytes 1 3))
+       (when-let [box-type (read-str is 4)]
+         {:size (be size-bytes)
+          :type box-type
+          :header-size 8})))))
+
 (defn- read-two-ints
   [is parser nob]
   [(read-int is parser nob)
@@ -127,14 +143,71 @@
           (check "WEBP")
           (read-webp-dimensions)))
 
+(defn- avif-brand?
+  [ftyp-payload]
+  (let [brands (keep #(when (= 4 (count %)) (apply str %))
+                     (partition 4 4 nil ftyp-payload))]
+    (boolean (some #{"avif" "avis"} brands))))
+
+(declare find-avif-ispe-dimensions)
+
+(defn- read-avif-box-dimensions
+  [is {:keys [size type header-size]}]
+  (let [payload-size (- size header-size)]
+    (cond
+      (neg? payload-size)
+      nil
+
+      (= type "ispe")
+      (some-> is
+              (skip 4)
+              (read-two-ints be 4))
+
+      (= type "meta")
+      (when (skip is 4)
+        (or (find-avif-ispe-dimensions is (- payload-size 4))
+            is))
+
+      (#{"iprp" "ipco"} type)
+      (or (find-avif-ispe-dimensions is payload-size)
+          is)
+
+      :else
+      (skip is payload-size))))
+
+(defn- find-avif-ispe-dimensions
+  [is size]
+  (loop [remaining size]
+    (when (pos? remaining)
+      (when-let [{:keys [size] :as box} (read-box-header is)]
+        (when (pos? size)
+          (let [result (read-avif-box-dimensions is box)]
+            (if (vector? result)
+              result
+              (recur (- remaining size)))))))))
+
+(defn- process-avif
+  [is first-byte]
+  (when-let [{:keys [size type header-size]} (read-box-header is first-byte)]
+    (let [payload-size (- size header-size)]
+      (when (and (= type "ftyp") (pos? payload-size))
+        (when-let [payload (read-str is payload-size)]
+          (when (avif-brand? payload)
+            (loop []
+              (when-let [box (read-box-header is)]
+                (let [result (read-avif-box-dimensions is box)]
+                  (if (vector? result)
+                    result
+                    (recur)))))))))))
+
 (defn get-dimensions
   [filepath]
   (with-open [is (input-stream (file filepath))]
     (let [first-byte (.read is)]
       (case first-byte
+        0x00 (process-avif is first-byte)
         0x89 (process-png is)
         0xFF (process-jpeg is)
         0x47 (process-gif is)
         0x52 (process-webp is)
         nil))))
-
