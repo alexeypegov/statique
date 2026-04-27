@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.66
+
+### Added
+
+- AVIF image dimensions are now supported by the built-in size reader.
+
+### Fixed
+
+- `sitemap.xml` is no longer regenerated for non-sitemap changes, and is not rewritten when rendered content is unchanged.
+
 ## 0.65
 
 ### Added
