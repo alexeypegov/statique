@@ -21,6 +21,36 @@
   "Protocol for pipeline stages"
   (execute [stage context state] "Execute the stage with given context and state"))
 
+(defn- file-exists?
+  [file]
+  (.exists file))
+
+(defn- sitemap-model
+  [config state]
+  (let [sitemap-item (partial notes/sitemap-item config)
+        sitemap-items (filter some? (map sitemap-item (vals state)))]
+    {:changed? (boolean (->> (vals state)
+                             (filter :changed?)
+                             (map sitemap-item)
+                             (some some?)))
+     :items sitemap-items
+     :most-recent-date (->> sitemap-items
+                            (map #(or (:updated %) (:date %)))
+                            (filter some?)
+                            (sort)
+                            (last))}))
+
+(defn- write-if-changed
+  [{:keys [exists? crc32 write-file]
+    :or {exists? file-exists?
+         crc32 u/crc32
+         write-file u/write-file}}
+   target-file rendered]
+  (when (or (not (exists? target-file))
+            (not= (crc32 target-file) (crc32 rendered)))
+    (write-file target-file rendered)
+    true))
+
 (defrecord LoadContentStage []
   PipelineStage
   (execute [_ context _state]
@@ -77,21 +107,16 @@
     (log/debug "Generating sitemap...")
     (u/with-context context [config renderer]
       (when-let [template (get-general config :sitemap-template)]
-        (when-let [_changed-items (seq (filter :changed? (vals state)))]
-          (let [sitemap-item (partial notes/sitemap-item config)
-                output-dir (get-general config :output-dir)
-                target-file (io/file output-dir "sitemap.xml")
-                sitemap-items (filter some? (map sitemap-item (vals state)))
-                most-recent-date (->> sitemap-items
-                                      (map #(or (:updated %) (:date %)))
-                                      (filter some?)
-                                      (sort)
-                                      (last))]
-            (log/info "Writing sitemap.xml")
-            (->> {:items sitemap-items :most-recent-date most-recent-date}
-                 (renderer template)
-                 u/check-render-error
-                 (u/write-file target-file))))))
+        (let [output-dir (get-general config :output-dir)
+              target-file (io/file output-dir "sitemap.xml")
+              model (sitemap-model config state)]
+          (when (or (:changed? model) (not (file-exists? target-file)))
+            (let [rendered (->> (select-keys model [:items :most-recent-date])
+                                (renderer template)
+                                u/check-render-error)]
+              (when (write-if-changed {} target-file rendered)
+                (log/info "Writing sitemap.xml")
+                nil))))))
     state))
 
 (defrecord CopyStaticStage []
