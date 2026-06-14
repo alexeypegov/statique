@@ -31,12 +31,11 @@ Statique turns Markdown files with YAML front matter into HTML using FreeMarker 
 
 ## Version
 
-0.66
+0.67
 
-### What's New in 0.66
+### What's New in 0.67
 
-- AVIF image dimensions are now supported by the built-in size reader.
-- `sitemap.xml` is regenerated only for sitemap-relevant changes and is not rewritten when rendered content is unchanged.
+- Both items & noembed won't be written on disk if data hasn't changed
 
 ## Usage
 
