@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [me.raynes.fs :as fs]
+            [fast-edn.core :as edn]
             [pandect.algo.crc32 :as crc])
   (:import [java.util Properties]
            [java.io FilenameFilter]))
@@ -54,7 +55,7 @@
   ([path default]
    (let [file (io/as-file path)]
      (if (.exists file)
-       (read-string (slurp file))
+       (edn/read-string (slurp file))
        default))))
 
 (defn validate-dir
@@ -120,13 +121,15 @@
 
 (defn file-cache
   "Returns a caching function that calculates a value using new-fn or returns previously calculated one if any,
-   returns the whole cache if ':all' is passed as a key, nils are not cached!"
+   returns the whole cache if ':all' is passed as a key, returns original hash if :hash is passed, nils are not cached!"
   [file new-fn]
-  (let [m (atom (read-edn file))]
+  (let [m    (atom (read-edn file))
+        hash (hash @m)]
     (fn [key]
       {:pre [(or (keyword? key) (string? key)) (fn? new-fn)]}
-      (if (= :all key)
-        @m
+      (case key
+        :all @m
+        :hash hash
         (if-let [existing (get @m key)]
           existing
           (when-let [new (new-fn key)]

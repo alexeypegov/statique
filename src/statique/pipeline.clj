@@ -127,22 +127,23 @@
       (static/copy config))
     _state))
 
-(defrecord PrepareCacheStage []
-  PipelineStage
-  (execute [_ _context state]
-    (log/debug "Preparing cache...")
-    (reduce (fn [r [k v]]
-              (assoc r k (dissoc v :rendered :target-file :changed?)))
-            {}
-            state)))
-
 (defrecord WriteCacheStage []
   PipelineStage
   (execute [_ context state]
-    (log/debug "Writing caches...")
+    (when (seq (filter #(or (:changed? %) (:cache-dirty? %)) (vals state)))
+      (log/debug "Writing item cache...")
+      (u/with-context context [config]
+        (dump-cache config "items"
+          (reduce (fn [r [k v]]
+              (assoc r k (dissoc v :rendered :target-file :changed? :cache-dirty?)))
+              {}
+              state))))
     (u/with-context context [config noembed]
-      (dump-cache config "items" state)
-      (dump-cache config "noembed" (noembed :all)))
+      (let [all (noembed :all)]
+        (when (not= (noembed :hash) (hash all))
+          (log/info "old hash " (noembed :hash) " new hash " (hash all))
+          (log/debug "Writing noembed cache...")
+          (dump-cache config "noembed" all))))
     state))
 
 ;; Default Pipeline
@@ -152,7 +153,6 @@
    ->CopyIndexStage
    ->GenerateSitemapStage
    ->CopyStaticStage
-   ->PrepareCacheStage
    ->WriteCacheStage])
 
 ;; Pipeline Execution

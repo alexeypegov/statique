@@ -256,7 +256,10 @@
       (log/info (str "Skipping draft: " slug (when (not= "true" msg) (str " - " msg))))
       (if cache-hit?
         items-cache
-        (assoc items-cache slug {:source-crc crc :transformed transformed})))))
+        (assoc items-cache slug {
+          :source-crc crc
+          :transformed transformed
+          :cache-dirty? true})))))
 
 (defn- prev-next
   [add-cnt coll]

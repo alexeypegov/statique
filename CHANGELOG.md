@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.67
+
+- Both items and noembed caches are not written if unchanged
+
 ## 0.66
 
 ### Added
