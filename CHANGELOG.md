@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.68
+
+### Added
+
+- Static file and directory copying is now incremental: files are skipped if the destination exists and CRC matches the source
+
+### Fixed
+
+- Draft items now correctly trigger an items cache write when a new draft is added or an existing draft's content changes
+
 ## 0.67
 
 - Both items and noembed caches are not written if unchanged

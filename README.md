@@ -27,15 +27,15 @@ Statique turns Markdown files with YAML front matter into HTML using FreeMarker 
 ## Not Yet Supported
 
 - Tags
-- Incremental static file copying
 
 ## Version
 
-0.67
+0.68
 
-### What's New in 0.67
+### What's New in 0.68
 
-- Both items & noembed won't be written on disk if data hasn't changed
+- Static file and directory copying is now incremental — files are skipped if the destination already exists and is unchanged
+- Draft items now correctly trigger an items cache write when added or their content changes
 
 ## Usage
 
@@ -49,7 +49,7 @@ Or build and run the standalone jar:
 
 ```bash
 lein uberjar
-java -jar target/statique-0.66-standalone.jar
+java -jar target/statique-0.68-standalone.jar
 ```
 
 ### Command Line Options

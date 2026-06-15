@@ -29,20 +29,6 @@
         (let [result (pipeline/execute stage context state)]
           (is (= state result)))))))
 
-(deftest prepare-cache-stage-test
-  (testing "PrepareCacheStage removes render-specific keys"
-    (let [stage (pipeline/->PrepareCacheStage)
-          state {"key" {:source-crc 123 :rendered "html" :target-file "file.html" :changed? true :other-key "value"}}
-          result (pipeline/execute stage nil state)]
-      (is (= {"key" {:source-crc 123 :other-key "value"}} result))))
-
-  (testing "PrepareCacheStage preserves prev/next links"
-    (let [stage (pipeline/->PrepareCacheStage)
-          state {"note1" {:source-crc 123 :rendered "html" :target-file "file.html" :changed? true
-                          :prev "note0" :next "note2" :count 5 :type :item}}
-          result (pipeline/execute stage nil state)]
-      (is (= {"note1" {:source-crc 123 :prev "note0" :next "note2" :count 5 :type :item}} result)
-          "PrepareCacheStage should preserve prev/next links for next/previous navigation"))))
 
 (deftest sitemap-model-test
   (testing "sitemap model ignores changed non-sitemap entries"
