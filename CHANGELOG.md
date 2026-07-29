@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.69
+
+### Added
+
+- Markdown typography: `--` is now rendered as an en dash (–) and `---` as an em dash (—) in note and page text. Inline code and code blocks are left untouched.
+
 ## 0.68
 
 ### Added

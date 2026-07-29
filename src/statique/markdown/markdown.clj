@@ -1,5 +1,6 @@
 (ns statique.markdown.markdown
-  (:require [clojure.string :as s])
+  (:require [clojure.string :as s]
+            [statique.markdown.typography :as typography])
   (:import [org.commonmark.parser Parser]
            [org.commonmark.renderer.html HtmlRenderer]
            [org.commonmark.ext.gfm.strikethrough StrikethroughExtension]
@@ -10,7 +11,7 @@
 (def ^:private array-values ["Tags"])
 
 (defonce default-extensions
-  [(StrikethroughExtension/create) (YamlFrontMatterExtension/create)])
+  [(StrikethroughExtension/create) (YamlFrontMatterExtension/create) (typography/dashes-extension)])
 
 (defonce ^:private front-matter-extensions
   [(YamlFrontMatterExtension/create)])

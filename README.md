@@ -16,6 +16,7 @@ Statique turns Markdown files with YAML front matter into HTML using FreeMarker 
 - RSS and Atom feed generation
 - Incremental rendering with an items cache
 - Markdown image rendering with `loading="lazy"` and automatic `width` / `height` attributes
+- Typographic dashes: `--` becomes an en dash (–) and `---` becomes an em dash (—)
 - Built-in image dimension reader for PNG, JPEG, GIF, WebP, and AVIF
 - Retina image support with the `@2x` filename postfix
 - YouTube, Vimeo, and Coub embeds using [noembed][noembed]
@@ -30,12 +31,11 @@ Statique turns Markdown files with YAML front matter into HTML using FreeMarker 
 
 ## Version
 
-0.68
+0.69
 
-### What's New in 0.68
+### What's New in 0.69
 
-- Static file and directory copying is now incremental — files are skipped if the destination already exists and is unchanged
-- Draft items now correctly trigger an items cache write when added or their content changes
+- Markdown typography: `--` is now rendered as an en dash (–) and `---` as an em dash (—) in note and page text. Inline code and code blocks are left untouched.
 
 ## Usage
 
@@ -49,7 +49,7 @@ Or build and run the standalone jar:
 
 ```bash
 lein uberjar
-java -jar target/statique-0.68-standalone.jar
+java -jar target/statique-0.69-standalone.jar
 ```
 
 ### Command Line Options
